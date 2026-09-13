@@ -10,7 +10,7 @@
 
 ### 1.1 High-Level Architecture
 
-The system is a **sport-centric attendance management platform** for a university athletics department. It replaces a legacy `Camp → Team → Sport` hierarchy with a flat **`Sport`-program model**, where each sport program owns its roster of athletes, training sessions, attendance registers, and performance evaluations.
+The system is a **sport-centric attendance management platform** for a university athletics department. It replaces a legacy `Camp → Team → Sport` hierarchy with a flat **`Sport`-program model**, where each sport program owns its training sessions, attendance registers, and performance evaluations, and draws its athletes from a **shared player pool** — players participate in many sports via the `player_sports` join table (Phase-1 multi-sport refactor).
 
 Logical topology:
 
@@ -53,7 +53,7 @@ Three consumers share one Spring Security session story:
 | **Authn / Authz** | Spring Security | HTTP Basic + Form login + `DaoAuthenticationProvider` + `BCryptPasswordEncoder`; method-level `@PreAuthorize` |
 | **Ops** | Actuator | Exposes `/actuator/health`, `/actuator/info` only |
 
-> **Note on documentation drift:** `backend/README.md` still describes the pre-migration `Camp/Team` model and a `requests.http` file that no longer exists. The authoritative schema is the **Flyway migration chain (V1→V4) + JPA entities**, documented below.
+> **Note on documentation drift:** `backend/README.md` still describes the pre-migration `Camp/Team` model and a `requests.http` file that no longer exists. The authoritative schema is the **Flyway migration chain (V1→V6) + JPA entities**, documented below. V5 moved athletes from single-sport (`players.sport_id`) to multi-sport (`player_sports`) and made captaincy player-based (`sport_captains.player_id`); V6 added `players.department`.
 
 ---
 
@@ -62,33 +62,36 @@ Three consumers share one Spring Security session story:
 ### 2.1 Entity–Relationship Overview
 
 ```
-┌──────────┐  N           N  ┌──────────┐
-│  users   │◄──sport_captains──►│  sports  │
-│ (admin/  │  (join)  1   1    │          │
-│  captain)│                  └────┬─────┘
-└────┬─────┘                       │ 1
-     │ 1                    ┌──────┴──────┐
-     │ (marked_by /         │             │
-     │  evaluated_by)       ▼             ▼
-     │             ┌────────────┐   ┌──────────────┐
-     │             │  players   │   │ training_    │
-     │             │  (roster)  │   │ sessions     │
-     │             └─────┬──────┘   └──────┬───────┘
-     │                   │ 1               │ 1
-     │                   ▼                 ▼
-     └────────────────►┌───────────────────────┐
-                       │  attendances          │  (player_id ✕ session_id UNIQUE)
-                       └──────────┬────────────┘
-                                  │
-                        ┌─────────▼─────────┐
-                        │ player_evaluations│  (player_id ✕ session_id UNIQUE)
-                        └───────────────────┘
+                          ┌───────────────────────────┐
+                          │       player_sports       │  M : N join (PK: player_id + sport_id)
+                          │  player_id ⟷ sport_id     │
+                          └────────────┬──────────────┘
+                                       │ M            │ N
+                            ┌──────────▼──┐    ┌──────▼─────────┐
+                            │  players     │    │   sports      │
+                            │  (athletes)  │    │  (programs)   │
+                            └──────┬───────┘    └──────┬─────────┘
+                                   │ 1                 │ 1
+                                   │          ┌────────▼─────────┐
+                                   │          │  training_sessions│
+                                   │          └────────┬─────────┘
+                                   │                    │ 1
+                          ┌────────▼──────┐    ┌────────▼─────────┐
+                          │  attendances  │    │ player_evaluations│
+                          └───────────────┘    └──────────────────┘
+                                    (player_id ✕ session_id UNIQUE on both)
+
+Captaincy  :  sport_captains (sport_id, player_id, UNIQUE(player_id))
+              A sport has ≤3 player-captains; a single player captains ≤1 sport
+              (uk_captain_single_sport).
+Audit FKs  :  attendances.marked_by, player_evaluations.evaluated_by → users.id (SET NULL)
+              users (ROLE_CAPTAIN login accounts) are bridged to players via shared email.
 ```
 
 | Relationship | Cardinality | Mapping | Cascade |
 | :--- | :--- | :--- | :--- |
-| `users` ⟷ `sports` (captainship) | M : N | `sport_captains` join table (`Sport.captains`) | Both FKs `ON DELETE CASCADE` |
-| `sports` → `players` | 1 : N | `players.sport_id` | `ON DELETE CASCADE` |
+| `players` ⟷ `sports` (membership) | M : N | `player_sports` join table (`Player.sports`, owning) | Both FKs `ON DELETE CASCADE` |
+| `players` ⟷ `sports` (captainship) | M : N, captained ≤ 1 | `sport_captains` join table (`Sport.captains`) | Both FKs `ON DELETE CASCADE` |
 | `sports` → `training_sessions` | 1 : N | `training_sessions.sport_id` | `ON DELETE CASCADE` |
 | `players` → `attendances` | 1 : N | `attendances.player_id` | `ON DELETE CASCADE` |
 | `training_sessions` → `attendances` | 1 : N | `attendances.session_id` | `ON DELETE CASCADE` |
@@ -125,14 +128,28 @@ All tables inherit the audit pair `created_at TIMESTAMP NOT NULL DEFAULT NOW()` 
 | `active` | BOOLEAN | NOT NULL, DEFAULT TRUE | **Soft-delete flag**; inactive sports hidden from `/api/sports/active` |
 | `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
 
-#### `sport_captains` (join table)
+#### `sport_captains` (join table — player-based captaincy)
 
 | Field | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `sport_id` | BIGINT | FK → `sports.id`, `ON DELETE CASCADE`; part of composite PK | Owning sport |
-| `captain_id` | BIGINT | FK → `users.id`, `ON DELETE CASCADE`; part of composite PK | Assigned captain/coach |
+| `player_id` | BIGINT | FK → `players.id`, `ON DELETE CASCADE`; part of composite PK | Assigned player-captain |
+| `assigned_at` | TIMESTAMP | NOT NULL | When the captain was assigned |
+| — | — | **UNIQUE** `uk_captain_single_sport` (`player_id`) | **A player captains at most one sport** |
 
-Business rule enforced at the application layer: **max 3 captains per sport** (`MAX_CAPTAINS_PER_SPORT = 3` in `SportService`).
+Migration note (V5): `sport_captains` previously linked `users.id`; the V5 migration recreates it against `players.id`, migrating existing captains by matching player↔user email, and adds the single-captain rule.
+
+Business rules enforced at the application layer: **max 3 captains per sport** (`MAX_CAPTAINS_PER_SPORT = 3` in `SportService`) and **≤1 sport per captain** (also backed by the `uk_captain_single_sport` unique constraint).
+
+#### `player_sports` (join table — multi-sport membership)
+
+| Field | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `player_id` | BIGINT | FK → `players.id`, `ON DELETE CASCADE`; part of composite PK | Athlete |
+| `sport_id` | BIGINT | FK → `sports.id`, `ON DELETE CASCADE`; part of composite PK | Sport they participate in |
+| `created_at` | TIMESTAMP | NOT NULL | Audit timestamp |
+
+Added in V5; seeded from the previous single-sport `players.sport_id`. The `Player.sports` (`@ManyToMany`, owning side) collection is kept in sync with the sport side via `Player.addSport`/`removeSport` helpers.
 
 #### `players`
 
@@ -141,15 +158,16 @@ Business rule enforced at the application layer: **max 3 captains per sport** (`
 | `id` | BIGINT | PK — `player_id_seq` | Surrogate key |
 | `full_name` | VARCHAR(150) | NOT NULL | Athlete name |
 | `date_of_birth` | DATE | NULL | DOB (PII — visibility governed, §5) |
-| `jersey_number` | INT | NULL | Unique **per sport** |
+| `jersey_number` | INT | NULL | Jersey number (no longer unique per sport — multi-sport model dropped `uk_player_jersey_sport` in V5) |
 | `position` | VARCHAR(200) | NULL | e.g. Striker, Bowler, Player-Coach |
 | `phone` | VARCHAR(20) | NULL | Contact (PII) |
-| `email` | VARCHAR(100) | NULL | Contact; key link for captain promotion |
+| `email` | VARCHAR(100) | NULL | Contact; key link for captain promotion / email bridge to a `users` login |
+| `department` | VARCHAR(100) | NULL | University department / team label (V6) → shown in unified profile |
 | `notes` | VARCHAR(500) | NULL | Free text / medical notes (PII) |
 | `active` | BOOLEAN | NOT NULL, DEFAULT TRUE | Soft-deactivation flag (`PlayerService.deactivate`) |
-| `sport_id` | BIGINT | NOT NULL, FK → `sports.id`, `ON DELETE CASCADE` | Owning program |
 | `created_at` / `updated_at` | TIMESTAMP | NOT NULL | Audit timestamps |
-| — | — | **UNIQUE** `uk_player_jersey_sport` (`jersey_number`, `sport_id`) | Prevents duplicate jersey numbers within a sport |
+
+Memberships live in `player_sports` (not a `sport_id` column). For backward compatibility the entity still exposes a computed `sportId` — the id of the **first** sport in the set — used only as a display hint; callers should prefer the explicit `sports[]` list.
 
 #### `training_sessions`
 
@@ -277,10 +295,10 @@ Business rule enforced at the application layer: **max 3 captains per sport** (`
 | Step | Detail |
 | :--- | :--- |
 | 1 | Client (RosterPage) calls `useMySports()` → `GET /api/sports/my` |
-| 2 | `SportApiController.listMySports` → resolves user; **admin ⇒ all active; captain ⇒ `sportService.findByCaptainId(id)`** (JPQL `JOIN FETCH captains WHERE c.id=:captainId`) |
+| 2 | `SportApiController.listMySports` → `PlayerService.findCaptainSports(user)` — **admin ⇒ all active; captain ⇒** bridge user→player via email (`findByEmail`) then `sportRepository.findByCaptainId(playerId)` (JPQL `JOIN FETCH captains WHERE c.id=:captainId`) |
 | 3 | RosterPage auto-selects first sport → `GET /api/sports/{sportId}/players` |
-| 4 | `PlayerApiController.listBySport` → `isCaptainOfSport(user, sportId)`; captain not assigned ⇒ **403**; admin ⇒ pass |
-| 5 | `PlayerService.findAllBySport` → `PlayerRepository.findBySportId` → only players of that sport returned |
+| 4 | `PlayerApiController.listBySport` → `isCaptainOfSport(user, sportId)` (player-based via email bridge); captain not assigned ⇒ **403**; admin ⇒ pass |
+| 5 | `PlayerService.findAllBySport` → `PlayerRepository.findBySportId` → `JOIN p.sports` — the distinct players whose `player_sports` membership includes that sport |
 
 #### C. Bulk attendance submission (captain marks registers)
 
@@ -305,27 +323,29 @@ Business rule enforced at the application layer: **max 3 captains per sport** (`
 | 5 | Persist `User{role=ROLE_CAPTAIN}`; returns `201` + serialized user (password never serialized — `@JsonIgnore`) |
 | 6 | Client invalidates `['captains']` query; captain now assignable to a sport (§ E) |
 
-#### E. Admin promotes a player → captain (privileged lifecycle)
+#### E. Promote / demote a player ↔ captain (privileged lifecycle)
 
-| Step | Detail |
-| :--- | :--- |
-| 1 | Client discards typed `{username, password}` for the player |
-| 2 | `POST /api/sports/{sportId}/players/{playerId}/promote-captain`, `@PreAuthorize("hasAuthority('ROLE_ADMIN')")` |
-| 3 | `PlayerService.promoteToCaptain` — resolution ladder: **(1)** reuse existing `ROLE_CAPTAIN` user by typed username; **(2)** reuse captain account previously auto-created from the player's email; **(3)** else create a new `ROLE_CAPTAIN` user (fullName/email/phone seeded from the player row) |
-| 4 | `SportService.assignCaptain` — **enforces ≤3 captains**; exceeding ⇒ `IllegalStateException` (400) |
-| 5 | `Sport.captains.add(captain)` → join row in `sport_captains`; response `200 {captain, passwordNote}` |
-| 6 | Reverse op `demote` is intended to remove the join row only (the `users` account survives). **⚠ Verified defect:** `PlayerService.demoteFromCaptain` passes `player.getSportId()` in the `captainId` argument slot of `sportService.removeCaptain(...)` (`PlayerService.java:144`), so the captain is **not** actually removed from `sport_captains` and the operation no-ops. See §4.4 #6 |
-| 7 | Client invalidates `['sports', sportId, 'players']`, `['sports']`, `['captains']` |
+Captaincy attaches to the **player** (`sport_captains.player_id`). Two promotion paths exist:
+
+**Path 1 — player-centric promotion (admin *and* the sport's own captains):**
+`POST /api/sports/{sportId}/captains/{playerId}`. `@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")`; the controller then checks `isCaptain(me, sportId)` (admin short-circuits), verifies the player is a member of the sport (via `player.sports`), and calls `SportService.assignCaptain`. **Enforces ≤3 captains per sport and ≤1 sport per captain** (the latter also backed by `uk_captain_single_sport`). Responses: `200 {sportId, playerId, message}`; `400` if the player captains another sport or already at capacity. This path does **not** create a login account.
+
+**Path 2 — legacy admin promote-with-account:**
+`POST /api/sports/{sportId}/players/{playerId}/promote-captain`, `@PreAuthorize("hasAuthority('ROLE_ADMIN')")`. `PlayerService.promoteToCaptain` resolution ladder: **(1)** reuse existing `ROLE_CAPTAIN` user by typed username; **(2)** reuse a captain account previously auto-created from the player's email; **(3)** else create a new `ROLE_CAPTAIN` user (fullName/email/phone seeded from the player row) — then calls `assignCaptain`. The `users` login account and the `sport_captains` row are kept consistent via the shared email.
+
+**Demote (reverse):** `POST /api/sports/{sportId}/players/{playerId}/demote` (admin) → `PlayerService.demoteFromCaptain` → `SportService.removeCaptain(sportId, playerId)` removes the `sport_captains` join row only; the `users` account (if any) survives. `DELETE /api/sports/{id}/captain/{captainId}` (admin) is the equivalent remove-by-player-id endpoint. (The Phase-1 rewrite fixed a defect where demotion passed the wrong id and no-op'ed.)
 
 ### 3.3 Payload Transformations (Jackson projections)
 
 | Entity | Exposed computed DTO fields | Hidden fields |
 | :--- | :--- | :--- |
-| `Player` | `sportId` (`@JsonProperty` from `sport.id`) | `attendances`, `evaluations` (`@JsonIgnore`), `sport` partially (`@JsonIgnoreProperties`) |
+| `Player` | `sports[]` (`Set<Sport>`), `department`, computed `sportId` (`@JsonProperty`, first sport — display hint only) | `attendances`, `evaluations` (`@JsonIgnore`); nested `Sport` values stripped of `players`/`captains`/`trainingSessions` (`@JsonIgnoreProperties`) |
 | `TrainingSession` | `sportId` | `attendances` (`@JsonIgnore`) |
 | `Attendance` | `playerId`, `sessionId`, `playerFullName` (computed) | `player`, `session`, `markedBy` full graphs (`@JsonIgnoreProperties` → flattened to IDs) |
-| `Sport` | `captains[]` (with `@JsonIgnoreProperties`) | `players`, `trainingSessions` collections (`@JsonIgnore`) |
+| `Sport` | `captains[]` as **player** values (`@JsonIgnoreProperties` on the `Player` side) | `players`, `trainingSessions` collections (`@JsonIgnore`); `getPrimaryCaptain()` (`@JsonIgnore`) |
 | `User` | all fields | `passwordHash` (`@JsonIgnore`) |
+
+Plus a dedicated DTO read-model, `GET /api/players/{id}/profile`, returns `PlayerProfileDTO` — a flattened `{id, fullName, email, phone, department, isCaptain, captainOfSport, sports[]}`. `GET /api/sports/overview` returns `SportOverviewDTO` rows `{id, name, description, active, totalPlayers, captains[]}`.
 
 Result: the API is already a **read-model with field reduction** — nested graphs are flattened to scalar IDs in transit, keeping payloads small and avoiding lazy-loading serialization errors.
 
@@ -348,9 +368,9 @@ Recommended production hardening: introduce a `@RestControllerAdvice` emitting a
 | Role (`users.role`) | Persona | System entitlement |
 | :--- | :--- | :--- |
 | `ROLE_ADMIN` | System Administrator(s) | **Global.** Every domain entity, every sport, every captain. Sole owner of identity administration (create/edit/disable/delete users, reset passwords, assign/remove captains, promote/demote player→captain, sport CRUD + lifecycle). Seed account `admin / admin123` (bcrypt) is bootstrapped by `V2__seed_data.sql`. |
-| `ROLE_CAPTAIN` | Captain / Coach | **Scoped.** Operates **only** on sports where they appear in `sport_captains` (≤3 per sport, `SportService`). Can read their assigned programs, their rosters, sessions, attendance; can register athletes, create/update/delete sessions, record attendance. Cannot access user administration, other sports, or global lists beyond their scope. |
+| `ROLE_CAPTAIN` | Captain / Coach | **Scoped.** Operates **only** on sports where they appear — **as a player** — in `sport_captains` (≤3 per sport, `SportService`). Can read their assigned programs, their rosters, sessions, attendance; can register athletes, create/update/delete sessions, record attendance, and **promote/demote player-captains within their own sport** (`POST /api/sports/{sportId}/captains/{playerId}`). Cannot access user administration, other sports, or global lists beyond their scope. |
 
-No third "player" identity exists in the system — athletes exist as `players` records without login credentials. A promoted athlete becomes a `ROLE_CAPTAIN` user while remaining a `players` row.
+No third "player" identity exists in the system — athletes exist as `players` records without login credentials. Captaincy is **player-based** (`sport_captains.player_id`): a promoted athlete becomes a player-captain while remaining a `players` row. In the interim model a `ROLE_CAPTAIN` `users` login account is still the way a captain signs in, kept consistent with their player row via the shared email column — see the hardening note §4.4 #6.
 
 ### 4.2 Permissions Catalog (atomic)
 
@@ -360,15 +380,17 @@ No third "player" identity exists in the system — athletes exist as `players` 
 | `sport:create` | `POST /api/sports` | `@PreAuthorize ROLE_ADMIN` |
 | `sport:update` | `PUT/PATCH /api/sports/{id}` | `@PreAuthorize ROLE_ADMIN` |
 | `sport:delete` | `DELETE /api/sports/{id}` | `@PreAuthorize ROLE_ADMIN` |
-| `sport:cptn:assign` | `POST /api/sports/{id}/captain` | `@PreAuthorize ROLE_ADMIN` |
-| `sport:cptn:remove` | `DELETE /api/sports/{id}/captain/{captainId}` | `@PreAuthorize ROLE_ADMIN` |
-| `player:read` | `GET /api/sports/{sportId}/players`, `GET /api/players/{id}` | Authenticated + captain-of-sport scope |
+| `sport:cptn:assign` | `POST /api/sports/{id}/captain` (body `{captainId: <playerId>}`) | `@PreAuthorize ROLE_ADMIN` |
+| `sport:cptn:remove` | `DELETE /api/sports/{id}/captain/{captainId}` (player id) | `@PreAuthorize ROLE_ADMIN` |
+| `sport:cptn:promote` | `POST /api/sports/{sportId}/captains/{playerId}` | `@PreAuthorize hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')` + `isCaptain(me, sportId)` |
+| `player:read` | `GET /api/sports/{sportId}/players`, `GET /api/players/{id}`, `GET /api/players/{id}/profile` | Authenticated + captain-of-sport/player scope |
 | `player:read:all` | `GET /api/players` | Admin (all) / captain (own sports only) |
-| `player:create` | `POST /api/sports/{sportId}/players` | Admin or Captain + captain-of-sport |
-| `player:update` | `PUT /api/players/{id}` | Admin or Captain + captain-of-player |
+| `player:create` | `POST /api/sports/{sportId}/players`, `POST /api/players` | Admin or Captain + captain-of-sport (body: `sportIds[]` + `department`) |
+| `player:update` | `PUT /api/players/{id}` | Admin or Captain + captain-of-player (optional `sportIds[]` replaces memberships) |
 | `player:delete` | `DELETE /api/players/{id}` | Admin or Captain + captain-of-player |
-| `player:promote` | `POST …/promote-captain` | `@PreAuthorize ROLE_ADMIN` |
-| `player:demote` | `POST …/demote` | `@PreAuthorize ROLE_ADMIN` |
+| `player:promote` | `POST …/promote-captain` (legacy admin, creates login) | `@PreAuthorize ROLE_ADMIN` |
+| `player:demote` | `POST …/demote` (legacy admin) | `@PreAuthorize ROLE_ADMIN` |
+| `sports:overview` | `GET /api/sports/overview` | `@PreAuthorize ROLE_ADMIN` |
 | `session:read` | `GET /api/sessions`, `GET /api/sports/{sportId}/sessions`, `GET /api/sessions/{id}` | Authenticated + captain-of-sport/session scope |
 | `session:create` | `POST /api/sports/{sportId}/sessions` | Admin or Captain + captain-of-sport |
 | `session:update` | `PUT /api/sessions/{id}` | Admin or Captain + captain-of-session |
@@ -398,9 +420,9 @@ Legend: **C** = Create, **R** = Read, **U** = Update, **D** = Delete. "Owned spo
 | **ADMIN** | Attendance | ✔ | ✔ | ✔ | ✔ | Global (reads + records as any captain) |
 | **ADMIN** | Captains/Users (accounts) | ✔ | ✔ | ✔ | ✔ | Global only — sole role with `member:*` |
 | **ADMIN** | Own profile | — | ✔ | ✔ | — | Self (`/api/auth/me`) |
-| **CAPTAIN** | Sports | — | ✔ | — | — | Only sports where `sport_captains` contains them; `GET /api/sports` (unscoped) and `/active` do leak all names |
-| **CAPTAIN** | Sport captains | — | — | — | — | **No access** — cannot read/modify assignments |
-| **CAPTAIN** | Players | ✔ | ✔ | ✔ | ✔ | Only players whose `sport` is an owned sport |
+| **CAPTAIN** | Sports | — | ✔ | — | — | Only sports where `sport_captains` contains them (as a player); `GET /api/sports` (unscoped) and `/active` do leak all names |
+| **CAPTAIN** | Sport captains | — | ✔ | ✔ | ✔ | **Read**, plus promote/demote player-captains **within an owned sport** only (`POST /api/sports/{sportId}/captains/{playerId}`); cannot assign/remove in other sports |
+| **CAPTAIN** | Players | ✔ | ✔ | ✔ | ✔ | Only players with a `player_sports` membership in an owned sport (multi-sport owners are in scope for **each** owned sport) |
 | **CAPTAIN** | Training sessions | ✔ | ✔ | ✔ | ✔ | Only sessions whose `sport` is an owned sport |
 | **CAPTAIN** | Attendance | ✔ | ✔ | ✔ | ✔ | Session/player must belong to owned sport |
 | **CAPTAIN** | Users/Accounts | — | — | — | — | **No access** (all `member:*` are admin-only) |
@@ -408,7 +430,7 @@ Legend: **C** = Create, **R** = Read, **U** = Update, **D** = Delete. "Owned spo
 
 **Two-layer enforcement model (defense in depth):**
 1. **Role gate** — `@PreAuthorize` (method) + `authorizeHttpRequests` (URL) filter.
-2. **Ownership gate** — hand-rolled `isCaptainOfSport/Session/Player` helpers inside controllers, resolving the current `User` from `Authentication` and testing membership via `Sport.hasCaptain(user)`; admins short-circuit to `true`. Denied ⇒ 403 (`ResponseEntity.status(FORBIDDEN)` or `AccessDeniedException`).
+2. **Ownership gate** — hand-rolled `isCaptainOfSport/Session/Player` helpers inside controllers, resolving the **current player** from `Authentication` via the shared-email bridge (`PlayerService.findByEmail(user.getEmail())`) and testing `player.sports` membership (`Sport.hasCaptainByPlayerId(playerId)`); admins short-circuit to `true`. Denied ⇒ 403 (`ResponseEntity.status(FORBIDDEN)` or `AccessDeniedException`). Multi-sport membership means the check resolves per-sport: a player-captain in sport A is in scope for sport A only.
 
 ### 4.4 Hardening Observations (derived from code inspection)
 
@@ -419,7 +441,7 @@ Legend: **C** = Create, **R** = Read, **U** = Update, **D** = Delete. "Owned spo
 | 3 | `GET /api/sports` (plain `listAll`) and `GET /api/sports/active` return **all sports** regardless of role (the frontend compensates by using `/my` for captains) | Either scope `listAll` by captain ownership or restrict the unscoped list to admins |
 | 4 | Deleting a **sport** transactionally destroys athletes, sessions, and all attendance history (cascade) with only a client-side confirmation | Prefer soft-delete (`active=false`) + archive, or a two-step confirm with server-side guard when the sport has activity |
 | 5 | Basic-auth credentials are re-encoded and stored **recoverably** in `sessionStorage` (XSS-readable); no server-side session for the SPA | Migrate to token/session auth (e.g. Spring Session + cookie or JWT) and `Secure` storage |
-| 6 | **`demoteFromCaptain` passes the wrong id** — `removeCaptain(sport.getId(), player.getSportId())` (`PlayerService.java:144`) never removes the intended captain from `sport_captains` | Resolve the linked `User` (via player email/username) and pass that user id; add an integration test asserting the join row disappears |
+| 6 | **Interim captain auth is bridged by email, not identity** — a captain's `sport_captains` row points at a `player_id`, but sign-in and `marked_by`/`evaluated_by` auditing use a separate `users` row linked only via a shared `email` column (case-insensitive match). The two records can drift: editing the player's email orphans the bridge, deleting the `users` account silently removes the captain's login while leaving the captaincy, and two players sharing an email would collide. Related side-effect of the multi-sport model: `uk_player_jersey_sport` was dropped, so jersey numbers are no longer unique | Replace with real player-bound authentication — give `players` a credential (password hash on the player row, or a `player_credentials` table) so `sport_captains` and the login principal share one identity. Until then, treat `email` as the authoritative join key and enforce uniqueness across `players.email`; add an integration test asserting a demoted player's `sport_captains` row disappears |
 | 7 | `RoleGuard` renders `children` before the role check resolves — a wrong-role user **briefly sees admin UI** before being redirected | Render `null` until the role check completes (backend 403 stays authoritative) |
 | 8 | No `@ControllerAdvice` — inconsistent error shapes across controllers | Add a `@RestControllerAdvice` with a uniform error envelope |
 
@@ -453,9 +475,10 @@ Legend: **C** = Create, **R** = Read, **U** = Update, **D** = Delete. "Owned spo
 | | Coaches & Captains stat | Real captain count + list | Fixed `1` ("Your coach account") — **captain roster counts hidden** |
 | | Sessions table | All sports' upcoming sessions | Only owned sports' upcoming sessions (client-side filter `mySportIds`) |
 | **Roster** | Sport selector | **Dropdown** over all sports | **Fixed label** "Your Assigned Sport" — no selector |
-| | Coach display | — | Shows `currentSport.captain.fullName` (or "Unassigned") |
+| | Coach display | — | Shows the sport's captain(s) as **player names** — `currentSport.captains[].fullName` (or "Unassigned") |
 | | Roster actions | Register / Edit / Delete athlete | Register / Edit / Delete **within owned sport** (backend permits Captain+scope) |
-| | Athlete details sheet | Full contact + DOB + notes + attendance history | Same — scoped athlete |
+| | Athlete details sheet | Full contact (incl. **department**) + DOB + notes + attendance history; **profile view** shows `isCaptain` badge + sport-program chips (from `GET /api/players/{id}/profile`); **Promote** button for members | Same — scoped athlete; captain badge/sport chips identical for a multi-sport owner |
+| | Add / Edit athlete dialog | `sportIds[]` **multi-select** of programs + department field (primary sport locked-in for add) | Same within owned sport(s); at least one sport required |
 | **Attendance** | Sport selector | Dropdown | Fixed label (own sport) |
 | | "Schedule Session" | ✔ | ✔ (allowed for captains of the sport — `session:create`) |
 | | "Delete Session" | ✔ | ✔ (captains may delete — `session:delete`, scoped) |
@@ -475,7 +498,8 @@ Legend: **C** = Create, **R** = Read, **U** = Update, **D** = Delete. "Owned spo
 | **Sports Programs tab** | Create sport, activate/deactivate, delete | Exclusive |
 | | Captains/Admins per sport | Add/Remove with live `x / 3` slot counter; "Add Admin" disabled when full or when zero captains exist |
 | | Expandable player section | View per-sport roster inline with **Edit / Promote / Demote** per athlete |
-| | Demote | Intended to remove the captain-sport association; the `users` account survives — **⚠ blocked by the §4.4 #6 defect** |
+| | Demote | Removes the captain-sport association (`sport_captains` join row) by **player id**; the `users` login account (if any) survives — Phase-1 fix corrected the demote path |
+| | Assign Sport / Add Admin | Sources candidates from **`players`**, not User captain accounts; assigns `captainId: <playerId>` (≤3/sport, ≤1 sport per captain) |
 
 **What a captain never sees in any screen:** the Admin nav item, `/admin` route, captain/account management, captain-to-sport assignments, cross-sport data, global sport/session/player lists beyond owned scope, and user-direct endpoints (`/api/users/**`). Field reduction on the wire (all rows shaped at the controller/repository, sensitive nested graphs `@JsonIgnore`d) backs the UI hiding at the API layer.
 
@@ -486,4 +510,4 @@ Legend: **C** = Create, **R** = Read, **U** = Update, **D** = Delete. "Owned spo
 - **React Query wiring** (`main.tsx`): `staleTime 5 min`, `retry: 2`, `refetchOnWindowFocus: false`; mutations invalidate exact namespaced keys (`['sports', sportId, 'players']`, `['sessions', sessionId, 'attendance']`) or broad predicates (`q.queryKey[0] === 'sessions'`).
 - **No React Context / provider** for auth: `useAuth` hook + `sessionStorage` is the entire auth layer.
 - **Client-persisted username map** ("Already captain" detection in the promote dialog) matches player emails against captain stored usernames.
-- **Dead/unreferenced code paths** (no controller caller): `PlayerService.findActiveBySport`/`deactivate`, `PlayerRepository.countBySportIdAndActiveTrue`, `SportService.findByCaptainUsername`, `AttendanceRepository.countPresentBySport`, `TrainingSessionRepository.findBySportIdAndSessionDateBetween`, and the entire `player_evaluations` API surface.
+- **Dead/unreferenced code paths** (no controller caller): `PlayerService.findActiveBySport`/`deactivate` (the UI hard-deletes instead of deactivating), `PlayerRepository.countBySportIdAndActiveTrue`, `AttendanceRepository.countPresentBySport`, `TrainingSessionRepository.findBySportIdAndSessionDateBetween`, and the entire `player_evaluations` API surface. (`SportService.findByCaptainUsername` was removed in the player-centric refactor — captaincy queries now go through `sportRepository.findByCaptainId`.)
