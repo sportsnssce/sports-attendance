@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROLES, API_BASE_URL, type Role } from '@/lib/constants'
 import { type StoredAuth } from '@/api/client'
@@ -12,22 +12,32 @@ interface UseAuthReturn {
   logout: () => void
 }
 
+function readStoredAuth(): StoredAuth | null {
+  try {
+    const raw = sessionStorage.getItem('auth')
+    return raw ? (JSON.parse(raw) as StoredAuth) : null
+  } catch {
+    return null
+  }
+}
+
 export function useAuth(): UseAuthReturn {
-  const [role, setRole] = useState<Role | null>(null)
-  const [username, setUsername] = useState<string | null>(null)
+  // Read the persisted login synchronously so the very first render already knows the
+  // role. Otherwise role-gated queries (e.g. DashboardPage's useCaptains(!isCaptain))
+  // fire admin-only calls during the pre-effect frame and log 403s for captains.
+  const initialAuth = useMemo(() => readStoredAuth(), [])
+  const [role, setRole] = useState<Role | null>(initialAuth?.role ?? null)
+  const [username, setUsername] = useState<string | null>(initialAuth?.username ?? null)
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    const raw = sessionStorage.getItem('auth')
-    if (raw) {
-      try {
-        const auth = JSON.parse(raw) as StoredAuth
-        setRole(auth.role)
-        setUsername(auth.username)
-      } catch {
-        sessionStorage.removeItem('auth')
-      }
+    const stored = readStoredAuth()
+    if (!stored) {
+      sessionStorage.removeItem('auth')
+    } else {
+      setRole(stored.role)
+      setUsername(stored.username)
     }
     setIsLoading(false)
   }, [])
