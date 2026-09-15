@@ -27,6 +27,15 @@ export function useResetPassword() {
   })
 }
 
+export function useUpdateUsername() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, username }: { id: number; username: string }) =>
+      api.patch(`/api/users/${id}/username`, { username }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['captains'] }),
+  })
+}
+
 export function useToggleCaptain() {
   const qc = useQueryClient()
   return useMutation({

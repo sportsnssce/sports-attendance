@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { usePlayers, usePromotePlayerToCaptain } from '@/hooks'
-import { Crown, Search, ChevronRight } from 'lucide-react'
+import { usePlayers, usePlayerProfile, usePromotePlayerToCaptain } from '@/hooks'
+import { Crown, Search, ChevronRight, UserCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { type Sport, type CaptainLite, type Player } from '@/types'
 
@@ -41,8 +41,27 @@ export function PromoteCaptainModal({
 
   // Fresh session each open.
   const activePlayer = preselectedPlayer ?? selectedPlayer
+
+  // Whether the chosen athlete already has a captain login account — drives
+  // mandatory (new captain) vs optional (update existing) credential handling.
+  const { data: profile, isLoading: profileLoading } = usePlayerProfile(activePlayer?.id ?? 0)
+  const isExistingCaptain = !!activePlayer && profile?.hasCaptainLogin === true
+  const isCheckingAccount = !!activePlayer && profileLoading
   const captainIds = useMemo(() => new Set(sportCaptains.map((c) => c.id)), [sportCaptains])
   const remaining = Math.max(0, MAX_CAPTAINS_PER_SPORT - sportCaptains.length)
+
+  // Prefill the credentials section when a player is selected / profile finishes loading.
+  useEffect(() => {
+    if (!open) return
+    if (!activePlayer) { setUsername(''); setPassword(''); return }
+    if (profileLoading) return
+    if (profile?.hasCaptainLogin && profile.captainUsername) {
+      setUsername(profile.captainUsername)
+    } else {
+      setUsername('')
+    }
+    setPassword('')
+  }, [open, activePlayer?.id, profile?.hasCaptainLogin, profile?.captainUsername, profileLoading])
 
   const filtered = players.filter((p) => {
     if (captainIds.has(p.id)) return false
@@ -68,23 +87,29 @@ export function PromoteCaptainModal({
       toast.error('Select an athlete to promote.')
       return
     }
-    if (!username.trim()) {
-      toast.error('Enter a username for the new captain account.')
+    if (isCheckingAccount) {
+      toast.error('Checking the athlete\'s account status… please wait.')
       return
     }
-    if (!password.trim()) {
-      toast.error('Enter a password for the new captain account.')
+    if (!isExistingCaptain && !username.trim()) {
+      toast.error('A username is required for a new captain account.')
+      return
+    }
+    if (!isExistingCaptain && !password.trim()) {
+      toast.error('A password is required for a new captain account.')
       return
     }
     try {
       await promote.mutateAsync({
         sportId: sport.id,
         playerId: activePlayer.id,
-        username: username.trim(),
-        password: password.trim(),
+        username: username.trim() || undefined,
+        password: password.trim() || undefined,
       })
       toast.success(
-        `"${activePlayer.fullName}" promoted to captain of ${sport.name} with the username and password you set.`
+        isExistingCaptain
+          ? `"${activePlayer.fullName}" captain account updated for ${sport.name}.`
+          : `"${activePlayer.fullName}" promoted to captain of ${sport.name} with the username and password you set.`
       )
       handleClose()
     } catch (err: any) {
@@ -180,35 +205,55 @@ export function PromoteCaptainModal({
 
           {/* Credentials step */}
           <div className="space-y-3 pt-1 border-t border-border">
-            <div className="flex items-center gap-2">
-              <Crown className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-serif font-semibold text-brand-900">
-                {activePlayer ? `Captain login for ${activePlayer.fullName}` : 'Captain credentials'}
-              </span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Crown className="h-4 w-4 text-amber-500 shrink-0" />
+                <span className="text-sm font-serif font-semibold text-brand-900 truncate">
+                  {activePlayer ? `Captain login for ${activePlayer.fullName}` : 'Captain credentials'}
+                </span>
+              </div>
+              {activePlayer &&
+                (isCheckingAccount ? (
+                  <span className="text-[10px] text-slate-400 font-sans animate-pulse shrink-0">Checking account…</span>
+                ) : isExistingCaptain ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
+                    <UserCheck className="h-3 w-3" /> Account exists
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                    New captain
+                  </span>
+                ))}
             </div>
             <div className="grid grid-cols-1 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="promoteUsername" className="text-xs font-sans text-slate-700">Username *</Label>
+                <Label htmlFor="promoteUsername" className="text-xs font-sans text-slate-700">
+                  {isExistingCaptain ? 'Username (optional)' : 'Username *'}
+                </Label>
                 <Input
                   id="promoteUsername"
-                  placeholder="e.g. captain_david"
+                  placeholder={isExistingCaptain ? 'Leave blank to keep current' : 'e.g. captain_david'}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="h-8 text-xs font-sans"
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="promotePassword" className="text-xs font-sans text-slate-700">New Captain Password *</Label>
+                <Label htmlFor="promotePassword" className="text-xs font-sans text-slate-700">
+                  {isExistingCaptain ? 'New Password (optional)' : 'New Captain Password *'}
+                </Label>
                 <Input
                   id="promotePassword"
                   type="password"
-                  placeholder="e.g. Captain@1234"
+                  placeholder={isExistingCaptain ? 'Leave blank to keep current' : 'e.g. Captain@1234'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="h-8 text-xs font-sans"
                 />
                 <p className="text-[11px] text-slate-400 font-sans">
-                  Use a password the new captain can remember — their sign-in for this account.
+                  {isExistingCaptain
+                    ? 'Fields are optional — only entered values are applied.'
+                    : 'Use a password the new captain can remember — their sign-in for this account.'}
                 </p>
               </div>
             </div>
@@ -222,10 +267,10 @@ export function PromoteCaptainModal({
           <Button
             type="button"
             onClick={handlePromote}
-            disabled={!activePlayer || promote.isPending}
+            disabled={!activePlayer || promote.isPending || isCheckingAccount || (!isExistingCaptain && (!username.trim() || !password.trim()))}
             className="bg-accent hover:bg-accent-light text-white font-sans text-xs"
           >
-            {promote.isPending ? 'Promoting…' : 'Promote'}
+            {promote.isPending ? 'Saving…' : isExistingCaptain ? 'Update & Promote' : 'Promote'}
           </Button>
         </DialogFooter>
       </DialogContent>

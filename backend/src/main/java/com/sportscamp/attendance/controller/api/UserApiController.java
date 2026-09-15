@@ -44,8 +44,10 @@ public class UserApiController {
             map.put("enabled", c.isEnabled());
             map.put("active", c.isEnabled());
 
-            // Captains are stored as PLAYERS; a captain User's Player row is resolved by email.
-            Player captainPlayer = playerService.findByEmail(c.getEmail()).orElse(null);
+            // Captains are stored as PLAYERS; a captain User's Player row is resolved via the
+            // linked player id (falling back to email for legacy accounts).
+            Player captainPlayer = playerService.findLinkedPlayer(c).orElse(null);
+            map.put("playerId", captainPlayer == null ? null : captainPlayer.getId());
             List<Sport> assignedSports = captainPlayer == null
                     ? List.of()
                     : sportService.findByCaptainId(captainPlayer.getId());
@@ -88,7 +90,8 @@ public class UserApiController {
                     body.get("fullName").trim(),
                     body.get("email"),
                     body.get("phone"),
-                    User.Role.valueOf(body.getOrDefault("role", "ROLE_CAPTAIN"))
+                    User.Role.valueOf(body.getOrDefault("role", "ROLE_CAPTAIN")),
+                    null
             );
             return ResponseEntity.status(HttpStatus.CREATED).body(user);
         } catch (DuplicateResourceException e) {
@@ -100,10 +103,32 @@ public class UserApiController {
 
     /** PATCH /api/users/{id}/password  body: {"newPassword":"secret"} */
     @PatchMapping("/{id}/password")
-    public ResponseEntity<Void> resetPassword(@PathVariable Long id,
-                                              @RequestBody Map<String, String> body) {
-        userService.resetPassword(id, body.get("newPassword"));
+    public ResponseEntity<?> resetPassword(@PathVariable Long id,
+                                           @RequestBody Map<String, String> body) {
+        String newPassword = body == null ? null : body.get("newPassword");
+        if (newPassword == null || newPassword.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "New password is required"));
+        }
+        userService.resetPassword(id, newPassword);
         return ResponseEntity.noContent().build();
+    }
+
+    /** PATCH /api/users/{id}/username  body: {"username":"new_name"} — admin-only */
+    @PatchMapping("/{id}/username")
+    public ResponseEntity<?> updateUsername(@PathVariable Long id,
+                                            @RequestBody Map<String, String> body) {
+        String newUsername = body == null ? null : body.get("username");
+        if (newUsername == null || newUsername.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Username is required"));
+        }
+        try {
+            userService.setUsername(id, newUsername.trim());
+        } catch (DuplicateResourceException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+        return ResponseEntity.ok(Map.of("username", userService.findById(id).getUsername()));
     }
 
     /** PATCH /api/users/{id}/toggle  — enable / disable */

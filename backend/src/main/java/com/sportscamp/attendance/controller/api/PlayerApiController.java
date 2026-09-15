@@ -195,7 +195,7 @@ public class PlayerApiController {
         String username = body == null ? null : (body.get("username") != null ? body.get("username").toString() : null);
         String password = body == null ? null : (body.get("password") != null ? body.get("password").toString() : null);
         try {
-            Player promoted = playerService.promoteToCaptain(playerId, sportId, username, password, userService);
+            Player promoted = playerService.promoteToCaptain(playerId, sportId, username, password);
             Map<String, Object> result = new HashMap<>();
             result.put("captain", promoted);
             result.put("message", "Player is now a captain of the sport.");

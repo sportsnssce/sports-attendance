@@ -25,6 +25,7 @@ public class PlayerService {
 
     private final PlayerRepository playerRepository;
     private final SportService sportService;
+    private final UserService userService;
 
     public List<Player> findActiveBySport(Long sportId) {
         return playerRepository.findBySportIdAndActiveTrue(sportId);
@@ -64,6 +65,19 @@ public class PlayerService {
         if (user == null) return Optional.empty();
         return findByEmail(user.getEmail())
                 .or(() -> playerRepository.findByFullNameIgnoreCase(user.getFullName()));
+    }
+
+    /**
+     * Resolve the player record a captain login maps to. Prefers the explicit
+     * {@code users.player_id} link (set on promotion); falls back to the email/fullName
+     * heuristic only for legacy accounts created before the link existed.
+     */
+    public Optional<Player> findLinkedPlayer(User user) {
+        if (user == null) return Optional.empty();
+        if (user.getPlayerId() != null) {
+            return playerRepository.findById(user.getPlayerId());
+        }
+        return findByEmailOrFullName(user);
     }
 
     /**
@@ -129,19 +143,21 @@ public class PlayerService {
         if (req.active() != null) player.setActive(req.active());
     }
 
-    /** Unified player profile: contact info, department, sports, and captaincy status. */
+    /** Unified player profile: contact info, department, sports, captaincy status, and login account. */
     public PlayerProfileDTO getProfile(Long id) {
         Player player = findById(id);
 
         List<PlayerProfileDTO.SportInfo> sports = new ArrayList<>();
-        PlayerProfileDTO.SportInfo captainOf = null;
+        List<PlayerProfileDTO.SportInfo> captainSports = new ArrayList<>();
         for (Sport sport : player.getSports()) {
             PlayerProfileDTO.SportInfo info = new PlayerProfileDTO.SportInfo(sport.getId(), sport.getName());
             sports.add(info);
-            if (captainOf == null && sport.hasCaptainByPlayerId(player.getId())) {
-                captainOf = info;
+            if (sport.hasCaptainByPlayerId(player.getId())) {
+                captainSports.add(info);
             }
         }
+
+        User captainLogin = userService.findCaptainAccountForPlayer(player.getId(), player.getEmail()).orElse(null);
 
         return new PlayerProfileDTO(
                 player.getId(),
@@ -149,9 +165,11 @@ public class PlayerService {
                 player.getEmail(),
                 player.getPhone(),
                 player.getDepartment(),
-                captainOf != null,
-                captainOf,
-                List.copyOf(sports)
+                !captainSports.isEmpty(),
+                List.copyOf(captainSports),
+                List.copyOf(sports),
+                captainLogin != null,
+                captainLogin != null ? captainLogin.getUsername() : null
         );
     }
 
@@ -173,55 +191,56 @@ public class PlayerService {
     }
 
     /**
-     * Promotes a player to captain of a sport. Captaincy now attaches to the PLAYER directly
-     * (the {@code sport_captains} join table links to {@code players}), matching the V5 schema.
-     * For continuity, a ROLE_CAPTAIN {@code users} login account is still created/reused from
-     * the admin-provided username/password, linked to the player via the shared email, so the
-     * new captain can sign in. TODO (Phase 2): revisit whether captain login should be
-     * user-account based at all once the frontend supports player-based auth.
+     * Promotes a player to captain of a sport. Captaincy attaches to the PLAYER directly
+     * (the {@code sport_captains} join table links to {@code players}).
+     *
+     * <p>If the player already has a {@code ROLE_CAPTAIN} login account (linked by
+     * {@code users.player_id} or legacy email match), the username/password are both
+     * OPTIONAL: a non-blank username renames the account, a non-blank password resets it.
+     *
+     * <p>If the player has no account yet, username AND password are REQUIRED and a new
+     * captain login is created, permanently linked to the player.
      */
     @Transactional
-    public Player promoteToCaptain(Long playerId, Long sportId, String username, String rawPassword,
-                                   UserService userService) {
+    public Player promoteToCaptain(Long playerId, Long sportId, String username, String rawPassword) {
         Player player = findById(playerId);
         sportService.findById(sportId); // validate the sport exists before any account work
 
         String resolvedUsername = (username != null && !username.isBlank()) ? username.trim() : null;
 
-        // 1) Reuse an existing captain account with the chosen username
-        if (resolvedUsername != null && userService.userExistsByUsername(resolvedUsername)) {
-            User existing = userService.findByUsername(resolvedUsername);
-            if (existing.getRole() != User.Role.ROLE_CAPTAIN) {
+        // Already a captain login → credentials are optional (update username / reset password).
+        java.util.Optional<User> existing = userService.findCaptainAccountForPlayer(player.getId(), player.getEmail());
+        if (existing.isPresent()) {
+            User account = existing.get();
+            if (account.getRole() != User.Role.ROLE_CAPTAIN) {
                 throw new IllegalStateException(
-                        "Username \"" + resolvedUsername + "\" is taken by a non-captain user.");
+                        "Player \"" + player.getFullName() + "\" is linked to a non-captain account.");
             }
+            if (resolvedUsername != null && !resolvedUsername.equalsIgnoreCase(account.getUsername())) {
+                userService.setUsername(account.getId(), resolvedUsername);
+            }
+            if (rawPassword != null && !rawPassword.isBlank()) {
+                userService.resetPassword(account.getId(), rawPassword);
+            }
+            userService.linkPlayer(account.getId(), player.getId());
             sportService.assignCaptain(sportId, player);
             return player;
         }
 
-        // 2) Reuse a captain account previously created from this player's email
-        if (player.getEmail() != null && !player.getEmail().isBlank()
-                && userService.userExistsByEmail(player.getEmail())) {
-            User existing = userService.findUserByEmail(player.getEmail());
-            if (existing.getRole() != User.Role.ROLE_CAPTAIN) {
-                throw new IllegalStateException(
-                        "User with email " + player.getEmail() + " exists but is not a captain.");
-            }
-            sportService.assignCaptain(sportId, player);
-            return player;
-        }
-
-        // 3) Create a brand-new captain login account with the admin-provided credentials
+        // No account yet → username + password are mandatory to create a new captain login.
         if (resolvedUsername == null) {
             throw new IllegalArgumentException("A username is required to create the new captain account.");
         }
         if (rawPassword == null || rawPassword.isBlank()) {
             throw new IllegalArgumentException("A password is required to create the new captain account.");
         }
+        if (userService.userExistsByUsername(resolvedUsername)) {
+            throw new IllegalArgumentException("Username already taken: " + resolvedUsername);
+        }
         userService.createUser(
                 resolvedUsername, rawPassword,
                 player.getFullName(), player.getEmail(), player.getPhone(),
-                User.Role.ROLE_CAPTAIN
+                User.Role.ROLE_CAPTAIN, player.getId()
         );
         sportService.assignCaptain(sportId, player);
         return player;
@@ -243,13 +262,13 @@ public class PlayerService {
     // ------------------------------------------------------------------
 
     /**
-     * Sports the given user captains, resolved through their player record (email bridge).
+     * Sports the given user captains, resolved through their linked player record.
      * Admins see all active sports.
      */
     public List<Sport> findCaptainSports(User user) {
         if (user == null) return List.of();
         if (user.getRole() == User.Role.ROLE_ADMIN) return sportService.findAllActive();
-        return findByEmailOrFullName(user)
+        return findLinkedPlayer(user)
                 .map(p -> sportService.findByCaptainId(p.getId()))
                 .orElse(List.of());
     }
@@ -260,7 +279,7 @@ public class PlayerService {
     public boolean isCaptain(User user, Long sportId) {
         if (user == null) return false;
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        return findByEmailOrFullName(user)
+        return findLinkedPlayer(user)
                 .map(p -> sportService.isCaptain(sportId, p.getId()))
                 .orElse(false);
     }
@@ -272,7 +291,7 @@ public class PlayerService {
         if (user == null) return false;
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
         if (sport == null) return false;
-        return findByEmailOrFullName(user)
+        return findLinkedPlayer(user)
                 .map(p -> sport.hasCaptainByPlayerId(p.getId()))
                 .orElse(false);
     }
@@ -284,7 +303,7 @@ public class PlayerService {
     public boolean canManage(User user, Player target) {
         if (user == null) return false;
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        Long myPlayerId = findByEmailOrFullName(user).map(Player::getId).orElse(null);
+        Long myPlayerId = findLinkedPlayer(user).map(Player::getId).orElse(null);
         if (myPlayerId == null || target == null) return false;
         return target.getSports().stream()
                 .anyMatch(s -> s.hasCaptainByPlayerId(myPlayerId));

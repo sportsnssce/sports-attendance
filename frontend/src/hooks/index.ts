@@ -14,6 +14,7 @@ export {
   useCaptains,
   useCreateCaptain,
   useResetPassword,
+  useUpdateUsername,
   useToggleCaptain,
   useDeleteCaptain,
   useUpdateCaptain,

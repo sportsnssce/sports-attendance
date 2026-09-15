@@ -10,7 +10,6 @@ import com.sportscamp.attendance.service.PlayerService;
 import com.sportscamp.attendance.service.SportService;
 import com.sportscamp.attendance.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -108,7 +107,7 @@ public class SportApiController {
     /**
      * POST /api/sports/{id}/captain  body: {"captainId": 2}
      * Adds one player-captain to the sport (captainId is a PLAYER id). Fails if the sport
-     * already has 3 captains, or if the player already captains another sport.
+     * already has 3 captains.
      */
     @PostMapping("/{id}/captain")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -147,9 +146,9 @@ public class SportApiController {
 
     /**
      * POST /api/sports/{sportId}/captains/{playerId}
-     * Promotes a player to captain of a sport. Allowed for admins and the sport's existing
-     * captains. A player may captain at most one sport — promoting one who already captains
-     * another sport yields a 400 Bad Request.
+     * Promotes a player to captain of a sport (multi-sport captaincy is allowed). Allowed
+     * for admins and the sport's existing captains. Returns 400 if the sport already has
+     * its full allotment of captains.
      */
     @PostMapping("/{sportId}/captains/{playerId}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
@@ -170,9 +169,6 @@ public class SportApiController {
             sportService.assignCaptain(sportId, player);
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (DataIntegrityViolationException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "A player may be captain of at most one sport."));
         }
         return ResponseEntity.ok(Map.of(
                 "sportId", sportId,

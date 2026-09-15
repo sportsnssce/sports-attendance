@@ -81,9 +81,9 @@ Three consumers share one Spring Security session story:
                           └───────────────┘    └──────────────────┘
                                     (player_id ✕ session_id UNIQUE on both)
 
-Captaincy  :  sport_captains (sport_id, player_id, UNIQUE(player_id))
-              A sport has ≤3 player-captains; a single player captains ≤1 sport
-              (uk_captain_single_sport).
+Captaincy  :  sport_captains (PK(sport_id, player_id))
+              A sport has ≤3 player-captains; a player may captain multiple sports
+              (single-sport constraint dropped in V8).
 Audit FKs  :  attendances.marked_by, player_evaluations.evaluated_by → users.id (SET NULL)
               users (ROLE_CAPTAIN login accounts) are bridged to players via shared email.
 ```
@@ -139,7 +139,7 @@ All tables inherit the audit pair `created_at TIMESTAMP NOT NULL DEFAULT NOW()` 
 
 Migration note (V5): `sport_captains` previously linked `users.id`; the V5 migration recreates it against `players.id`, migrating existing captains by matching player↔user email, and adds the single-captain rule.
 
-Business rules enforced at the application layer: **max 3 captains per sport** (`MAX_CAPTAINS_PER_SPORT = 3` in `SportService`) and **≤1 sport per captain** (also backed by the `uk_captain_single_sport` unique constraint).
+Business rules enforced at the application layer: **max 3 captains per sport** (`MAX_CAPTAINS_PER_SPORT = 3` in `SportService`). A player may captain any number of sports (the `uk_captain_single_sport` unique constraint from V5 was dropped in V8).
 
 #### `player_sports` (join table — multi-sport membership)
 
@@ -328,7 +328,7 @@ Memberships live in `player_sports` (not a `sport_id` column). For backward comp
 Captaincy attaches to the **player** (`sport_captains.player_id`). Two promotion paths exist:
 
 **Path 1 — player-centric promotion (admin *and* the sport's own captains):**
-`POST /api/sports/{sportId}/captains/{playerId}`. `@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")`; the controller then checks `isCaptain(me, sportId)` (admin short-circuits), verifies the player is a member of the sport (via `player.sports`), and calls `SportService.assignCaptain`. **Enforces ≤3 captains per sport and ≤1 sport per captain** (the latter also backed by `uk_captain_single_sport`). Responses: `200 {sportId, playerId, message}`; `400` if the player captains another sport or already at capacity. This path does **not** create a login account.
+`POST /api/sports/{sportId}/captains/{playerId}`. `@PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")`; the controller then checks `isCaptain(me, sportId)` (admin short-circuits), verifies the player is a member of the sport (via `player.sports`), and calls `SportService.assignCaptain`. **Enforces ≤3 captains per sport** (a player may captain several sports). Responses: `200 {sportId, playerId, message}`; `400` if already at capacity. This path does **not** create a login account.
 
 **Path 2 — legacy admin promote-with-account:**
 `POST /api/sports/{sportId}/players/{playerId}/promote-captain`, `@PreAuthorize("hasAuthority('ROLE_ADMIN')")`. `PlayerService.promoteToCaptain` resolution ladder: **(1)** reuse existing `ROLE_CAPTAIN` user by typed username; **(2)** reuse a captain account previously auto-created from the player's email; **(3)** else create a new `ROLE_CAPTAIN` user (fullName/email/phone seeded from the player row) — then calls `assignCaptain`. The `users` login account and the `sport_captains` row are kept consistent via the shared email.
@@ -345,7 +345,7 @@ Captaincy attaches to the **player** (`sport_captains.player_id`). Two promotion
 | `Sport` | `captains[]` as **player** values (`@JsonIgnoreProperties` on the `Player` side) | `players`, `trainingSessions` collections (`@JsonIgnore`); `getPrimaryCaptain()` (`@JsonIgnore`) |
 | `User` | all fields | `passwordHash` (`@JsonIgnore`) |
 
-Plus a dedicated DTO read-model, `GET /api/players/{id}/profile`, returns `PlayerProfileDTO` — a flattened `{id, fullName, email, phone, department, isCaptain, captainOfSport, sports[]}`. `GET /api/sports/overview` returns `SportOverviewDTO` rows `{id, name, description, active, totalPlayers, captains[]}`.
+Plus a dedicated DTO read-model, `GET /api/players/{id}/profile`, returns `PlayerProfileDTO` — a flattened `{id, fullName, email, phone, department, isCaptain, captainSports[], sports[]}`. `GET /api/sports/overview` returns `SportOverviewDTO` rows `{id, name, description, active, totalPlayers, captains[]}`.
 
 Result: the API is already a **read-model with field reduction** — nested graphs are flattened to scalar IDs in transit, keeping payloads small and avoiding lazy-loading serialization errors.
 

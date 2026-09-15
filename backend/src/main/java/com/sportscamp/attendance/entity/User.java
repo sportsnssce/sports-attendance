@@ -38,6 +38,14 @@ public class User extends BaseEntity {
     @Column(length = 100)
     private String email;
 
+    /**
+     * Direct link to the PLAYER record this login belongs to (captains are players).
+     * Populated on promotion; used to resolve a captain's sport without relying on
+     * the email/fullName heuristic. May be null for legacy accounts.
+     */
+    @Column(name = "player_id")
+    private Long playerId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;

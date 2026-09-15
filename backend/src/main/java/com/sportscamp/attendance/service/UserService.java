@@ -52,7 +52,7 @@ public class UserService {
 
     @Transactional
     public User createUser(String username, String rawPassword, String fullName,
-                           String email, String phone, User.Role role) {
+                           String email, String phone, User.Role role, Long playerId) {
         if (userRepository.existsByUsername(username)) {
             throw new DuplicateResourceException("Username already taken: " + username);
         }
@@ -63,8 +63,21 @@ public class UserService {
                 .email(email)
                 .phone(phone)
                 .role(role)
+                .playerId(playerId)
                 .enabled(true)
                 .build();
+        return userRepository.save(user);
+    }
+
+    /**
+     * Permanently attach this login account to the given player record. Used when a
+     * captain login is created or reused, so the account always resolves to the exact
+     * player who captains the sport.
+     */
+    @Transactional
+    public User linkPlayer(Long userId, Long playerId) {
+        User user = findById(userId);
+        user.setPlayerId(playerId);
         return userRepository.save(user);
     }
 
@@ -99,6 +112,37 @@ public class UserService {
     public void deleteUser(Long userId) {
         User user = findById(userId);
         userRepository.delete(user);
+    }
+
+    /**
+     * Rename a user's login username. Throws if the new name is already taken.
+     */
+    @Transactional
+    public void setUsername(Long userId, String newUsername) {
+        User user = findById(userId);
+        String trimmed = newUsername.trim();
+        if (userRepository.existsByUsername(trimmed)) {
+            throw new DuplicateResourceException("Username already taken: " + trimmed);
+        }
+        user.setUsername(trimmed);
+        userRepository.save(user);
+    }
+
+    /**
+     * Find the captain login account associated with the given player.
+     * First checks the explicit {@code users.player_id} link; falls back to matching
+     * by email (legacy accounts created before V7).
+     */
+    public java.util.Optional<User> findCaptainAccountForPlayer(Long playerId, String email) {
+        if (playerId != null) {
+            List<User> byLink = userRepository.findByPlayerIdAndRole(playerId, User.Role.ROLE_CAPTAIN);
+            if (!byLink.isEmpty()) return java.util.Optional.of(byLink.get(0));
+        }
+        if (email != null && !email.isBlank()) {
+            List<User> byEmail = userRepository.findByEmailAndRole(email, User.Role.ROLE_CAPTAIN);
+            if (!byEmail.isEmpty()) return java.util.Optional.of(byEmail.get(0));
+        }
+        return java.util.Optional.empty();
     }
 
     @Transactional

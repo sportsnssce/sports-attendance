@@ -13,7 +13,6 @@ import java.util.Set;
 /**
  * A sport program (e.g. Football, Cricket, Basketball, Athletics).
  * Each sport can have up to 3 player-captains who manage players, sessions, and attendance.
- * A single player may captain at most one sport (enforced by {@code uk_captain_single_sport}).
  */
 @Entity
 @Table(name = "sports",
@@ -42,7 +41,7 @@ public class Sport extends BaseEntity {
 
     /**
      * Player-captains for this sport (owning side of the {@code sport_captains} join table).
-     * Many captains per sport, but a single player can captain at most one sport.
+     * A sport has up to 3 captains; the same player may captain several sports.
      */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

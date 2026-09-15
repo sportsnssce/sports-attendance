@@ -3,8 +3,11 @@ package com.sportscamp.attendance.dto;
 import java.util.List;
 
 /**
- * Unified player profile. {@code isCaptain} is true when the player captains a sport;
- * {@code captainOfSport} is then the sport they lead, otherwise {@code null}.
+ * Unified player profile. {@code isCaptain} is true when the player captains at least one
+ * sport; {@code captainSports} lists every sport they lead (multi-sport captaincy is
+ * supported, so the list may contain several entries).
+ * {@code hasCaptainLogin} / {@code captainUsername} describe the captain login account
+ * linked to this player, if one exists (null/blank when there is none).
  */
 public record PlayerProfileDTO(
         Long id,
@@ -13,8 +16,10 @@ public record PlayerProfileDTO(
         String phone,
         String department,
         boolean isCaptain,
-        SportInfo captainOfSport,
-        List<SportInfo> sports
+        List<SportInfo> captainSports,
+        List<SportInfo> sports,
+        boolean hasCaptainLogin,
+        String captainUsername
 ) {
     public record SportInfo(Long id, String name) {
     }

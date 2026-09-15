@@ -86,8 +86,10 @@ export function usePromotePlayerToCaptain() {
     }: {
       sportId: number
       playerId: number
-      username: string
-      password: string
+      /** Optional for players who already have a captain login (updates it); required for new ones. */
+      username?: string
+      /** Optional for players who already have a captain login (resets it); required for new ones. */
+      password?: string
     }) =>
       api
         .post(`/api/sports/${sportId}/players/${playerId}/promote-captain`, { username, password })

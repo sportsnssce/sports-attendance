@@ -59,9 +59,8 @@ public class SportService {
     }
 
     /**
-     * Add a player as captain of a sport. Fails if the sport already has 3 captains, or if
-     * the player already captains a different sport (a player may captain at most one sport —
-     * enforced both here and by the {@code uk_captain_single_sport} DB constraint).
+     * Add a player as a captain of a sport. Fails if the sport already has
+     * {@value #MAX_CAPTAINS_PER_SPORT} captains. A player may captain multiple sports.
      */
     @Transactional
     public Sport assignCaptain(Long sportId, Player captain) {
@@ -73,12 +72,6 @@ public class SportService {
         }
         if (sport.getCaptains().stream().anyMatch(c -> c.getId().equals(captain.getId()))) {
             return sport; // already a captain of this sport
-        }
-        List<Sport> alreadyCaptaining = sportRepository.findByCaptainId(captain.getId());
-        if (!alreadyCaptaining.isEmpty() && !alreadyCaptaining.get(0).getId().equals(sportId)) {
-            throw new IllegalStateException(
-                    "Player \"" + captain.getFullName() + "\" is already captain of \""
-                    + alreadyCaptaining.get(0).getName() + "\". A player may captain only one sport.");
         }
         sport.getCaptains().add(captain);
         return sportRepository.save(sport);

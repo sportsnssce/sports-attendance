@@ -33,8 +33,13 @@ export interface PlayerProfile {
   phone?: string | null
   department?: string | null
   isCaptain: boolean
-  captainOfSport?: SportLite | null
+  /** Every sport this player captains (multi-sport captaincy is supported). */
+  captainSports: SportLite[]
   sports: SportLite[]
+  /** True when the player already has a ROLE_CAPTAIN login account. */
+  hasCaptainLogin: boolean
+  /** Existing login username (when hasCaptainLogin is true). */
+  captainUsername?: string | null
 }
 
 /** Create/update payload accepted by POST /api/players and PUT /api/players/{id}. */

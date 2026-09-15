@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,9 +28,12 @@ import {
   useUpdatePlayer,
   useDemoteCaptain,
   usePlayers,
+  useCaptains,
+  useUpdateUsername,
+  useResetPassword,
 } from '@/hooks'
-import { Plus, Trophy, Activity, Trash2, Pencil, Crown, Users, UserX, UserPlus, Search, ChevronDown, ChevronUp } from 'lucide-react'
-import { type Sport, type CaptainLite, type Player } from '@/types'
+import { Plus, Trophy, Activity, Trash2, Pencil, Crown, Users, UserX, UserPlus, Search, ChevronDown, ChevronUp, KeyRound } from 'lucide-react'
+import { type Sport, type CaptainLite, type Player, type Captain } from '@/types'
 
 export default function AdminPage() {
   const [createSportOpen, setCreateSportOpen] = useState(false)
@@ -81,6 +84,65 @@ export default function AdminPage() {
   const updateSport = useUpdateSport()
   const deleteSport = useDeleteSport()
   const demoteCaptain = useDemoteCaptain()
+  const updateUsername = useUpdateUsername()
+  const resetPassword = useResetPassword()
+  const { data: captainUsers = [] } = useCaptains()
+
+  // Login accounts keyed by the PLAYER id of the captain they're linked to.
+  const captainAccountsByPlayerId = useMemo(
+    () =>
+      new Map(
+        captainUsers
+          .filter((c) => c.playerId != null)
+          .map((c) => [c.playerId as number, c])
+      ),
+    [captainUsers]
+  )
+
+  const [credsDialog, setCredsDialog] = useState<{
+    open: boolean
+    account: Captain | null
+    username: string
+    password: string
+  }>({ open: false, account: null, username: '', password: '' })
+
+  const openCaptainCredentials = (cap: CaptainLite) => {
+    const account = captainAccountsByPlayerId.get(cap.id)
+    if (!account) return
+    setCredsDialog({ open: true, account, username: account.username, password: '' })
+  }
+
+  const closeCredsDialog = () => setCredsDialog((prev) => ({ ...prev, open: false }))
+
+  const credsSaving = updateUsername.isPending || resetPassword.isPending
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const account = credsDialog.account
+    if (!account) return
+    const newUsername = credsDialog.username.trim()
+    const newPassword = credsDialog.password.trim()
+    const usernameChanged = newUsername !== '' && newUsername !== account.username
+    const passwordProvided = newPassword !== ''
+    if (!usernameChanged && !passwordProvided) {
+      toast.error('Enter a new username or password to update.')
+      return
+    }
+    try {
+      const tasks: Promise<unknown>[] = []
+      if (usernameChanged) {
+        tasks.push(updateUsername.mutateAsync({ id: account.id, username: newUsername }))
+      }
+      if (passwordProvided) {
+        tasks.push(resetPassword.mutateAsync({ id: account.id, newPassword }))
+      }
+      await Promise.all(tasks)
+      toast.success(`Credentials updated for ${account.fullName}.`)
+      closeCredsDialog()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update credentials.')
+    }
+  }
 
   const handleCreateSport = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -293,6 +355,8 @@ export default function AdminPage() {
               onEditPlayer={openEditPlayer}
               onViewProfile={(player) => setViewProfile({ player, sportId: sport.id, sportName: sport.name })}
               onDemote={(player) => handleDemotePlayer(sport.id, player)}
+              captainAccounts={captainAccountsByPlayerId}
+              onEditCredentials={openCaptainCredentials}
             />
           ))}
         </div>
@@ -590,6 +654,65 @@ export default function AdminPage() {
         open={!!viewProfile}
         onOpenChange={(open) => !open && setViewProfile(null)}
       />
+
+      {/* Captain Credentials Dialog (admin-only) */}
+      <Dialog open={credsDialog.open} onOpenChange={(open) => !open && closeCredsDialog()}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
+          <form onSubmit={handleSaveCredentials}>
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+                <KeyRound className="h-5 w-5 text-amber-500" />
+                Captain Credentials
+              </DialogTitle>
+              <DialogDescription className="font-sans text-xs text-muted-foreground">
+                Update the login for <span className="font-medium text-foreground">{credsDialog.account?.fullName ?? 'the captain'}</span>.
+                Leave the password blank to keep the current one.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="credsUsername" className="text-xs font-sans text-foreground">Username</Label>
+                <Input
+                  id="credsUsername"
+                  value={credsDialog.username}
+                  onChange={(e) => setCredsDialog((prev) => ({ ...prev, username: e.target.value }))}
+                  className="h-9 text-sm font-sans"
+                  placeholder="e.g. captain_david"
+                  autoComplete="username"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="credsPassword" className="text-xs font-sans text-foreground">New Password (optional)</Label>
+                <Input
+                  id="credsPassword"
+                  type="password"
+                  value={credsDialog.password}
+                  onChange={(e) => setCredsDialog((prev) => ({ ...prev, password: e.target.value }))}
+                  className="h-9 text-sm font-sans"
+                  placeholder="Leave blank to keep current"
+                  autoComplete="new-password"
+                />
+                <p className="text-[11px] text-muted-foreground font-sans">
+                  Only entered fields are applied.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeCredsDialog} className="text-xs h-9">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={credsSaving}
+                className="bg-brand-900 hover:bg-brand-800 text-white font-medium text-xs h-9 gap-1.5"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                {credsSaving ? 'Saving…' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -606,6 +729,9 @@ interface SportCardProps {
   onEditPlayer: (player: Player, sportId: number) => void
   onViewProfile: (player: Player) => void
   onDemote: (player: Player) => void
+  /** Captain login accounts keyed by player id — enables admin username/password changes. */
+  captainAccounts: Map<number, Captain>
+  onEditCredentials: (cap: CaptainLite) => void
 }
 
 function SportCard({
@@ -620,6 +746,8 @@ function SportCard({
   onEditPlayer,
   onViewProfile,
   onDemote,
+  captainAccounts,
+  onEditCredentials,
 }: SportCardProps) {
   const { data: players = [], isLoading: playersLoading } = usePlayers(sport.id)
   const captainIds = new Set(sportCaptains.map((c) => c.id))
@@ -742,15 +870,28 @@ function SportCard({
                           {cap.email && <div className="text-[11px] font-mono text-muted-foreground truncate">{cap.email}</div>}
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-xs h-7 text-destructive hover:bg-destructive/10 p-1.5"
-                        onClick={() => onDemote({ id: cap.id, fullName: cap.fullName, email: cap.email } as Player)}
-                        title="Demote Captain"
-                      >
-                        <UserX className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {captainAccounts.get(cap.id) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-xs h-7 text-muted-foreground hover:text-foreground p-1.5"
+                            onClick={() => onEditCredentials(cap)}
+                            title="Change username / password"
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs h-7 text-destructive hover:bg-destructive/10 p-1.5"
+                          onClick={() => onDemote({ id: cap.id, fullName: cap.fullName, email: cap.email } as Player)}
+                          title="Demote Captain"
+                        >
+                          <UserX className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

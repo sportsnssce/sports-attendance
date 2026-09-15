@@ -35,7 +35,7 @@ import { CalendarDays, Plus, Trash2, Trophy, AlertTriangle } from 'lucide-react'
 import { parseISOLocal, todayISOLocal } from '@/lib/date'
 
 export default function AttendancePage() {
-  const { role, username } = useAuth()
+  const { role } = useAuth()
   const isCaptain = role === 'ROLE_CAPTAIN'
 
   const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)

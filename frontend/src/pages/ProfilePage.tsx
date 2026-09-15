@@ -127,7 +127,8 @@ export default function ProfilePage() {
   }
 
   const sports = myProfile?.sports ?? me?.sports ?? []
-  const captainName = myProfile?.captainOfSport?.name ?? me?.sports?.[0]?.name
+  const captainName =
+    (myProfile?.captainSports ?? []).map((s) => s.name).join(', ') || me?.sports?.[0]?.name
 
   return (
     <div className="space-y-6">
@@ -233,7 +234,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
                     <Crown className="h-4 w-4 text-amber-500" />
                     <span className="text-xs font-medium text-amber-800">
-                      👑 Captain of {myProfile.captainOfSport?.name ?? 'a sport'}
+                      👑 Captain of {captainName ?? 'a sport'}
                     </span>
                   </div>
                 )}

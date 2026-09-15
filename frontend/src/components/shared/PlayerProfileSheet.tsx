@@ -143,8 +143,9 @@ function PlayerProfileCard({
 
   if (!profile) return null
 
-  const captainsAnotherSport = profile.isCaptain && profile.captainOfSport != null
-  const canPromoteHere = showPromote && canPromote && sportId != null && !captainsAnotherSport
+  const captainSports = profile.captainSports ?? []
+  const alreadyCaptainHere = sportId != null && captainSports.some((s) => s.id === sportId)
+  const canPromoteHere = showPromote && canPromote && sportId != null && !alreadyCaptainHere
 
   return (
     <div className="space-y-3 pt-1 border-t border-border">
@@ -152,7 +153,7 @@ function PlayerProfileCard({
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
           <Crown className="h-4 w-4 text-amber-500" />
           <span className="text-xs font-medium text-amber-800">
-            👑 Captain of {profile.captainOfSport?.name ?? 'a sport'}
+            👑 Captain of {captainSports.map((s) => s.name).join(', ') || 'a sport'}
           </span>
         </div>
       ) : (
