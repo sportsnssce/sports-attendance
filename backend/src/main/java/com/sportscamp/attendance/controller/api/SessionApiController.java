@@ -52,14 +52,29 @@ public class SessionApiController {
         return sessionService.findAll();
     }
 
-    /** GET /api/sports/{sportId}/sessions */
+    /**
+     * GET /api/sports/{sportId}/sessions
+     * Optional params:
+     *   ?date=YYYY-MM-DD  -> sessions for that date (auto-creates default Morning/Evening if none exist)
+     *   ?from=&to=        -> sessions in a date range (no auto-generation)
+     */
     @GetMapping("/sports/{sportId}/sessions")
-    public ResponseEntity<List<TrainingSession>> listBySport(@PathVariable Long sportId, Authentication auth) {
+    public ResponseEntity<List<TrainingSession>> listBySport(@PathVariable Long sportId,
+                                                             @RequestParam(required = false) java.time.LocalDate date,
+                                                             @RequestParam(required = false) java.time.LocalDate from,
+                                                             @RequestParam(required = false) java.time.LocalDate to,
+                                                             Authentication auth) {
         if (auth != null && auth.isAuthenticated()) {
             User me = userService.findByUsername(auth.getName());
             if (!isCaptainOfSport(me, sportId)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
+        }
+        if (date != null) {
+            return ResponseEntity.ok(sessionService.findBySportAndDate(sportId, date));
+        }
+        if (from != null && to != null) {
+            return ResponseEntity.ok(sessionService.findBySportBetween(sportId, from, to));
         }
         return ResponseEntity.ok(sessionService.findBySport(sportId));
     }

@@ -48,13 +48,22 @@ public class PlayerService {
     }
 
     /**
-     * Resolve a player by email (case-insensitive). Captains are stored as PLAYERS, but login
-     * is still USER-based, so the shared {@code email} column bridges a logged-in user to their
-     * player record in the current interim captaincy model.
+     * Resolve a player by email (case-insensitive).
      */
     public Optional<Player> findByEmail(String email) {
         if (email == null || email.isBlank()) return Optional.empty();
         return playerRepository.findByEmailIgnoreCase(email);
+    }
+
+    /**
+     * Resolve a player by email or fullName (case-insensitive). Captains are stored as PLAYERS,
+     * but login is still USER-based, so the shared email or fullName bridges a logged-in user
+     * to their player record in the current interim captaincy model.
+     */
+    public Optional<Player> findByEmailOrFullName(User user) {
+        if (user == null) return Optional.empty();
+        return findByEmail(user.getEmail())
+                .or(() -> playerRepository.findByFullNameIgnoreCase(user.getFullName()));
     }
 
     /**
@@ -240,7 +249,7 @@ public class PlayerService {
     public List<Sport> findCaptainSports(User user) {
         if (user == null) return List.of();
         if (user.getRole() == User.Role.ROLE_ADMIN) return sportService.findAllActive();
-        return findByEmail(user.getEmail())
+        return findByEmailOrFullName(user)
                 .map(p -> sportService.findByCaptainId(p.getId()))
                 .orElse(List.of());
     }
@@ -251,7 +260,7 @@ public class PlayerService {
     public boolean isCaptain(User user, Long sportId) {
         if (user == null) return false;
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        return findByEmail(user.getEmail())
+        return findByEmailOrFullName(user)
                 .map(p -> sportService.isCaptain(sportId, p.getId()))
                 .orElse(false);
     }
@@ -263,7 +272,7 @@ public class PlayerService {
         if (user == null) return false;
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
         if (sport == null) return false;
-        return findByEmail(user.getEmail())
+        return findByEmailOrFullName(user)
                 .map(p -> sport.hasCaptainByPlayerId(p.getId()))
                 .orElse(false);
     }
@@ -275,7 +284,7 @@ public class PlayerService {
     public boolean canManage(User user, Player target) {
         if (user == null) return false;
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
-        Long myPlayerId = findByEmail(user.getEmail()).map(Player::getId).orElse(null);
+        Long myPlayerId = findByEmailOrFullName(user).map(Player::getId).orElse(null);
         if (myPlayerId == null || target == null) return false;
         return target.getSports().stream()
                 .anyMatch(s -> s.hasCaptainByPlayerId(myPlayerId));

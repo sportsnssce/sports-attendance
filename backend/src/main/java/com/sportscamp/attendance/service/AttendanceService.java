@@ -36,11 +36,14 @@ public class AttendanceService {
         return attendanceRepository.findBySportIdAndSessionId(sportId, sessionId);
     }
 
+    /** A single attendance draft: the status plus an optional remark. */
+    public record AttendanceDraft(AttendanceStatus status, String remarks) {}
+
     @Transactional
-    public void saveAttendance(Long sessionId, Map<Long, AttendanceStatus> playerStatusMap, User markedBy) {
+    public void saveAttendance(Long sessionId, Map<Long, AttendanceDraft> drafts, User markedBy) {
         TrainingSession session = sessionService.findById(sessionId);
 
-        for (Map.Entry<Long, AttendanceStatus> entry : playerStatusMap.entrySet()) {
+        for (Map.Entry<Long, AttendanceDraft> entry : drafts.entrySet()) {
             Player player = playerService.findById(entry.getKey());
             Attendance attendance = attendanceRepository
                     .findByPlayerIdAndSessionId(player.getId(), session.getId())
@@ -48,7 +51,12 @@ public class AttendanceService {
                             .player(player)
                             .session(session)
                             .build());
-            attendance.setStatus(entry.getValue());
+            AttendanceDraft draft = entry.getValue();
+            attendance.setStatus(draft.status());
+            // remarks: non-null draft value (blank -> null) overwrites; absent (null) leaves untouched
+            if (draft.remarks() != null) {
+                attendance.setRemarks(draft.remarks().isBlank() ? null : draft.remarks().trim());
+            }
             attendance.setMarkedBy(markedBy);
             attendance.setMarkedAt(LocalDateTime.now());
             attendanceRepository.save(attendance);

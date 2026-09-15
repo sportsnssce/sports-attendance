@@ -12,7 +12,7 @@ import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { StatCard } from '@/components/shared/StatCard'
 import { useSports, useMySports, useCaptains, useAllSessions } from '@/hooks'
 import { useAuth } from '@/hooks/useAuth'
-import { Trophy, ShieldCheck, Calendar, Activity } from 'lucide-react'
+import { Trophy, ShieldCheck, Calendar, Activity, Sparkles, Inbox } from 'lucide-react'
 
 export default function DashboardPage() {
   const { username, role } = useAuth()
@@ -43,10 +43,10 @@ export default function DashboardPage() {
 
   if (sportsLoading || captainsLoading || sessionsLoading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold text-brand-900">Executive Overview</h1>
-          <p className="text-slate-500 text-sm font-sans mt-1">Sports programs and training sessions</p>
+      <div className="space-y-6 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-8 w-64 bg-muted rounded-md" />
+          <div className="h-4 w-96 bg-muted/60 rounded-md" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
@@ -59,81 +59,107 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold text-brand-900">Executive Overview</h1>
-          <p className="text-slate-500 text-sm font-sans mt-1">
-            Welcome back, <span className="font-medium text-brand-800">{username}</span> ({isCaptain ? 'Captain' : 'Administrator'})
+    <div className="space-y-8">
+      {/* Top Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card border border-border p-6 rounded-xl shadow-2xs">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono text-xs font-semibold">
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Active Season</span>
+          </div>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Executive Overview
+          </h1>
+          <p className="text-muted-foreground text-sm font-sans">
+            Welcome back, <span className="font-semibold text-foreground">{username}</span> — managing{' '}
+            {isCaptain ? 'team performance' : 'campus athletic programs'}.
           </p>
         </div>
       </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Metric Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label={isCaptain ? "My Assigned Sports" : "Sports Programs"}
+          label={isCaptain ? 'My Disciplines' : 'Sports Programs'}
           value={totalSports}
-          sublabel={`${activeSports} active disciplines`}
-          icon={<Trophy className="h-5 w-5 text-accent" />}
+          sublabel={`${activeSports} active in roster`}
+          icon={<Trophy className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
         />
         <StatCard
-          label="Captains"
+          label="Team Captains"
           value={isCaptain ? 1 : totalCaptains}
-          sublabel={isCaptain ? "Your captain account" : "Assigned captains"}
-          icon={<ShieldCheck className="h-5 w-5 text-accent" />}
+          sublabel={isCaptain ? 'Assigned captain role' : 'Registered program leads'}
+          icon={<ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
         />
         <StatCard
           label="Upcoming Sessions"
           value={upcomingSessions.length}
-          sublabel="Scheduled training"
-          icon={<Calendar className="h-5 w-5 text-accent" />}
+          sublabel="Scheduled on calendar"
+          icon={<Calendar className="h-5 w-5 text-amber-500" />}
         />
         <StatCard
           label="Active Disciplines"
           value={activeSports}
           sublabel="Ready for training"
-          icon={<Activity className="h-5 w-5 text-accent" />}
+          icon={<Activity className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
         />
       </div>
 
-      {/* Upcoming Sessions Table */}
-      <div className="bg-card border border-border rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b border-border">
-          <h2 className="font-serif text-lg font-semibold text-brand-900">
-            {isCaptain ? 'Your Scheduled Training Sessions' : 'Upcoming Training Sessions'}
-          </h2>
+      {/* Upcoming Sessions Data Table */}
+      <div className="bg-card border border-border rounded-xl shadow-2xs overflow-hidden">
+        <div className="px-6 py-5 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div>
+            <h2 className="font-serif text-lg font-bold text-foreground tracking-tight">
+              {isCaptain ? 'Your Scheduled Training Sessions' : 'Upcoming Training Sessions'}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Live updates of upcoming team practices and custom sessions
+            </p>
+          </div>
+          <span className="font-mono text-xs bg-muted text-muted-foreground px-2.5 py-1 rounded-md font-semibold border border-border">
+            {upcomingSessions.length} Total
+          </span>
         </div>
+
         <div className="p-0 sm:overflow-x-auto">
           {upcomingSessions.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <p className="text-slate-400 font-sans text-sm">No upcoming training sessions scheduled.</p>
+            <div className="px-6 py-16 text-center space-y-3">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground">
+                <Inbox className="h-6 w-6" />
+              </div>
+              <p className="text-muted-foreground font-sans text-sm font-medium">
+                No upcoming training sessions scheduled.
+              </p>
             </div>
           ) : (
             <Table className="ledger-table w-full card-table">
               <TableHeader>
-                <TableRow className="bg-surface hover:bg-surface border-b border-border">
-                  <TableHead className="font-serif text-brand-800 min-w-[180px]">Session Title</TableHead>
-                  <TableHead className="font-serif text-brand-800 min-w-[120px]">Sport Discipline</TableHead>
-                  <TableHead className="font-serif text-brand-800 min-w-[100px]">Date</TableHead>
-                  <TableHead className="font-serif text-brand-800 min-w-[100px]">Time</TableHead>
-                  <TableHead className="font-serif text-brand-800 min-w-[80px]">Status</TableHead>
+                <TableRow className="bg-muted/50 border-b border-border">
+                  <TableHead className="font-serif text-foreground font-semibold min-w-[200px]">Session Title</TableHead>
+                  <TableHead className="font-serif text-foreground font-semibold min-w-[140px]">Sport Discipline</TableHead>
+                  <TableHead className="font-serif text-foreground font-semibold min-w-[120px]">Date</TableHead>
+                  <TableHead className="font-serif text-foreground font-semibold min-w-[140px]">Time</TableHead>
+                  <TableHead className="font-serif text-foreground font-semibold min-w-[100px]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {upcomingSessions.map((session) => (
-                  <TableRow key={session.id} className="hover:bg-surface/50">
-                    <TableCell data-label="Session" className="font-serif font-medium text-brand-900">
+                  <TableRow key={session.id} className="hover:bg-muted/40 transition-colors">
+                    <TableCell data-label="Session" className="font-serif font-semibold text-foreground">
                       {session.title}
                     </TableCell>
                     <TableCell data-label="Sport">
-                      <span className="font-sans text-sm">{session.sport?.name || 'General Sport'}</span>
+                      <span className="font-sans text-sm text-muted-foreground font-medium">
+                        {session.sport?.name || 'General Sport'}
+                      </span>
                     </TableCell>
                     <TableCell data-label="Date">
-                      <span className="font-mono text-sm">{session.sessionDate}</span>
+                      <span className="font-mono text-sm text-foreground">{session.sessionDate}</span>
                     </TableCell>
                     <TableCell data-label="Time">
-                      <span className="font-mono text-sm">{session.startTime || '—'} {session.endTime ? `– ${session.endTime}` : ''}</span>
+                      <span className="font-mono text-sm text-muted-foreground">
+                        {session.startTime || '—'} {session.endTime ? `– ${session.endTime}` : ''}
+                      </span>
                     </TableCell>
                     <TableCell data-label="Status">
                       <StatusBadge status={session.status} />

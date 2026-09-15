@@ -8,24 +8,25 @@ export function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-surface">
-      {/* Desktop sidebar — hidden on mobile */}
-      <div className="hidden sm:block">
+    <div className="flex h-screen w-full overflow-hidden bg-background font-sans text-foreground">
+      {/* Desktop sidebar — persistent left column */}
+      <aside className="hidden md:flex md:w-64 md:flex-col md:shrink-0 border-r border-border bg-card">
         <Sidebar />
-      </div>
+      </aside>
 
-      {/* Mobile sidebar — slide-out sheet */}
+      {/* Mobile sidebar — slide-out sheet drawer */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="p-0 w-64 border-r border-brand-800">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <Sidebar />
+        <SheetContent side="left" className="p-0 w-72 bg-card border-r border-border">
+          <SheetTitle className="sr-only">Navigation Drawer</SheetTitle>
+          <Sidebar onNavigate={() => setMobileMenuOpen(false)} />
         </SheetContent>
       </Sheet>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main content surface */}
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <Header onMenuClick={() => setMobileMenuOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto space-y-6">
             <Outlet />
           </div>
         </main>
@@ -33,4 +34,3 @@ export function AppLayout() {
     </div>
   )
 }
-

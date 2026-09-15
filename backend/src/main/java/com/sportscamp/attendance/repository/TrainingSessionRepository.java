@@ -27,4 +27,13 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
             @Param("sportId") Long sportId,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    @Query("""
+            SELECT ts FROM TrainingSession ts
+            LEFT JOIN FETCH ts.sport
+            WHERE ts.sport.id = :sportId
+              AND ts.sessionDate = :date
+            ORDER BY ts.startTime ASC
+            """)
+    List<TrainingSession> findBySportIdAndSessionDate(@Param("sportId") Long sportId, @Param("date") LocalDate date);
 }

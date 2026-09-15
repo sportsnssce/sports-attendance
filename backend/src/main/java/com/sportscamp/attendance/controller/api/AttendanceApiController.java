@@ -83,7 +83,7 @@ public class AttendanceApiController {
             throw new AccessDeniedException("You are not authorized to record attendance for this sport.");
         }
 
-        Map<Long, AttendanceStatus> statusMap = new HashMap<>();
+        Map<Long, AttendanceService.AttendanceDraft> drafts = new HashMap<>();
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> records = (List<Map<String, Object>>) body.get("records");
@@ -91,11 +91,12 @@ public class AttendanceApiController {
             records.forEach(r -> {
                 Long playerId = Long.valueOf(r.get("playerId").toString());
                 AttendanceStatus status = AttendanceStatus.valueOf(r.get("status").toString());
-                statusMap.put(playerId, status);
+                String remarks = r.containsKey("remarks") ? String.valueOf(r.get("remarks")) : null;
+                drafts.put(playerId, new AttendanceService.AttendanceDraft(status, remarks));
             });
         }
 
-        attendanceService.saveAttendance(sessionId, statusMap, me);
+        attendanceService.saveAttendance(sessionId, drafts, me);
         return ResponseEntity.noContent().build();
     }
 

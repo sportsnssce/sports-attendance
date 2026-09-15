@@ -32,4 +32,6 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
      * column on both tables is the shared key in the current interim captaincy model.
      */
     Optional<Player> findByEmailIgnoreCase(String email);
+
+    Optional<Player> findByFullNameIgnoreCase(String fullName);
 }

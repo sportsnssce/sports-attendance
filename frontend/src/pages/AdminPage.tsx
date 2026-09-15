@@ -29,11 +29,10 @@ import {
   useDemoteCaptain,
   usePlayers,
 } from '@/hooks'
-import { Plus, Trophy, Activity, Trash2, Pencil, Crown, Users, UserX, UserPlus } from 'lucide-react'
+import { Plus, Trophy, Activity, Trash2, Pencil, Crown, Users, UserX, UserPlus, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import { type Sport, type CaptainLite, type Player } from '@/types'
 
 export default function AdminPage() {
-  // Modal state
   const [createSportOpen, setCreateSportOpen] = useState(false)
   const [deleteSportDialog, setDeleteSportDialog] = useState<{ open: boolean; sport: Sport | null }>({
     open: false,
@@ -50,7 +49,6 @@ export default function AdminPage() {
   })
   const [viewProfile, setViewProfile] = useState<{ player: Player; sportId: number; sportName: string } | null>(null)
 
-  // Edit player dialog
   const [editPlayerDialog, setEditPlayerDialog] = useState<{ open: boolean; player: Player | null; sportId: number | null }>({
     open: false,
     player: null,
@@ -68,20 +66,16 @@ export default function AdminPage() {
     sportIds: [] as number[],
   })
 
-  // Forms
   const [sportForm, setSportForm] = useState({
     name: '',
     description: '',
   })
 
-  // Search + expansion
   const [sportSearch, setSportSearch] = useState('')
   const [expandedSports, setExpandedSports] = useState<Set<number>>(new Set())
 
-  // Queries
   const { data: sports = [], isLoading: sportsLoading } = useSports()
 
-  // Mutations
   const updatePlayer = useUpdatePlayer()
   const createSport = useCreateSport()
   const updateSport = useUpdateSport()
@@ -160,7 +154,6 @@ export default function AdminPage() {
     }
   }
 
-  // Open edit player dialog with pre-filled form
   const openEditPlayer = (player: Player, sportId: number) => {
     setEditPlayerForm({
       fullName: player.fullName,
@@ -221,10 +214,10 @@ export default function AdminPage() {
 
   if (sportsLoading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold text-brand-900">Administration</h1>
-          <p className="text-slate-500 text-sm font-sans mt-1">Manage sports programs and captains</p>
+      <div className="space-y-6 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-8 w-64 bg-muted rounded-md" />
+          <div className="h-4 w-96 bg-muted/60 rounded-md" />
         </div>
         <LoadingSkeleton type="table" count={5} />
       </div>
@@ -240,43 +233,48 @@ export default function AdminPage() {
   const assignSport = sports.find((s) => s.id === assignDialog.sportId) ?? null
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold text-brand-900">Administration</h1>
-          <p className="text-slate-500 text-sm font-sans mt-1">
-            Manage sports disciplines, assign captains, and configure programs.
+    <div className="space-y-8">
+      {/* Top Banner & Main Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card border border-border p-6 rounded-xl shadow-2xs">
+        <div className="space-y-1">
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            System Administration
+          </h1>
+          <p className="text-muted-foreground text-sm font-sans">
+            Configure athletic programs, allocate captains, and manage overall campus discipline rosters.
           </p>
         </div>
         <Button
           onClick={() => setCreateSportOpen(true)}
-          className="bg-accent hover:bg-accent-light text-white font-sans text-xs gap-1.5"
+          className="bg-brand-900 hover:bg-brand-800 text-white font-medium text-xs h-10 px-4 gap-2 rounded-lg shadow-2xs transition-all self-start sm:self-auto"
         >
           <Plus className="h-4 w-4" />
-          New Sport
+          <span>New Sport Program</span>
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <Input
-          placeholder="Search sports programs…"
-          value={sportSearch}
-          onChange={(e) => setSportSearch(e.target.value)}
-          className="max-w-sm text-xs font-sans"
-        />
-        <span className="text-xs font-mono text-slate-400">
-          {filteredSports.length} of {sports.length} sports
+      {/* Program Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card border border-border p-4 rounded-xl shadow-2xs">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search sports programs…"
+            value={sportSearch}
+            onChange={(e) => setSportSearch(e.target.value)}
+            className="pl-9 text-xs h-9 bg-muted/30 border-border"
+          />
+        </div>
+        <span className="text-xs font-mono text-muted-foreground font-semibold">
+          Showing {filteredSports.length} of {sports.length} Programs
         </span>
       </div>
 
-      {/* Unified sports dashboard */}
+      {/* Sports Grid Workspace */}
       {filteredSports.length === 0 ? (
-        <div className="bg-card border border-border rounded-lg p-12 text-center">
-          <Trophy className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-slate-400 font-sans text-sm">
-            {sportSearch ? 'No sports match your search.' : 'No sports programs yet. Create your first sport to get started.'}
+        <div className="bg-card border border-border rounded-xl p-16 text-center space-y-3">
+          <Trophy className="h-10 w-10 text-muted-foreground mx-auto" />
+          <p className="text-muted-foreground font-sans text-sm font-medium">
+            {sportSearch ? 'No sports match your search filter.' : 'No sports programs configured yet.'}
           </p>
         </div>
       ) : (
@@ -300,91 +298,94 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* CREATE SPORT DIALOG */}
-      <Dialog open={createSportOpen} onOpenChange={(open) => {
-        if (!open) setCreateSportOpen(false)
-      }}>
-        <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
+      {/* Create Sport Modal */}
+      <Dialog open={createSportOpen} onOpenChange={setCreateSportOpen}>
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <form onSubmit={handleCreateSport}>
-            <DialogHeader>
-              <DialogTitle className="font-serif flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-accent" />
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+                <Trophy className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Add Sport Program
               </DialogTitle>
-              <DialogDescription>
-                Add a new sport discipline (e.g. Football, Basketball, Cricket, Athletics).
+              <DialogDescription className="text-muted-foreground text-xs">
+                Create a new athletic discipline (e.g., Football, Track & Field, Cricket).
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3.5 my-4">
-              <div className="space-y-1">
-                <Label htmlFor="sportName" className="text-xs font-sans text-slate-700">Sport Name *</Label>
+            <div className="space-y-4 my-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="sportName" className="text-xs font-semibold text-foreground">Sport Name *</Label>
                 <Input
                   id="sportName"
                   placeholder="e.g. Athletics"
                   value={sportForm.name}
                   onChange={(e) => setSportForm({ ...sportForm, name: e.target.value })}
                   required
+                  className="h-9 text-xs"
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="sportDescription" className="text-xs font-sans text-slate-700">Description</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="sportDescription" className="text-xs font-semibold text-foreground">Description</Label>
                 <Input
                   id="sportDescription"
-                  placeholder="e.g. Track & field conditioning"
+                  placeholder="e.g. Track & field training program"
                   value={sportForm.description}
                   onChange={(e) => setSportForm({ ...sportForm, description: e.target.value })}
+                  className="h-9 text-xs"
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setCreateSportOpen(false)}>
+            <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateSportOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" className="bg-accent hover:bg-accent-light text-white font-sans text-xs">
-                Create Sport
+              <Button type="submit" className="w-full sm:w-auto bg-brand-900 hover:bg-brand-800 text-white font-medium">
+                Create Program
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* EDIT SPORT DIALOG */}
+      {/* Edit Sport Modal */}
       <Dialog open={editSportDialog.open} onOpenChange={(open) => {
         if (!open) setEditSportDialog({ open: false, sport: null })
       }}>
-        <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <form onSubmit={handleUpdateSport}>
-            <DialogHeader>
-              <DialogTitle className="font-serif flex items-center gap-2">
-                <Pencil className="h-5 w-5 text-accent" />
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+                <Pencil className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Edit Sport Program
               </DialogTitle>
-              <DialogDescription>
-                Update the details for <strong>{editSportDialog.sport?.name}</strong>.
+              <DialogDescription className="text-muted-foreground text-xs">
+                Update configuration details for <strong>{editSportDialog.sport?.name}</strong>.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3.5 my-4">
-              <div className="space-y-1">
-                <Label htmlFor="editSportName" className="text-xs font-sans text-slate-700">Sport Name *</Label>
+            <div className="space-y-4 my-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="editSportName" className="text-xs font-semibold text-foreground">Sport Name *</Label>
                 <Input
                   id="editSportName"
                   value={editSportForm.name}
                   onChange={(e) => setEditSportForm({ ...editSportForm, name: e.target.value })}
                   required
-                  className="h-8 text-xs font-sans"
+                  className="h-9 text-xs"
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="editSportDescription" className="text-xs font-sans text-slate-700">Description</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="editSportDescription" className="text-xs font-semibold text-foreground">Description</Label>
                 <Input
                   id="editSportDescription"
                   value={editSportForm.description}
                   onChange={(e) => setEditSportForm({ ...editSportForm, description: e.target.value })}
-                  className="h-8 text-xs font-sans"
+                  className="h-9 text-xs"
                 />
               </div>
-              <div className="flex items-center justify-between py-1">
-                <Label htmlFor="editSportActive" className="text-xs font-sans text-slate-700">Active</Label>
+              <div className="flex items-center justify-between py-2 border-t border-b border-border">
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-foreground">Active Status</span>
+                  <span className="text-[11px] text-muted-foreground">Allow active session scheduling</span>
+                </div>
                 <Switch
                   id="editSportActive"
                   checked={editSportForm.active}
@@ -392,11 +393,11 @@ export default function AdminPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditSportDialog({ open: false, sport: null })}>
+            <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditSportDialog({ open: false, sport: null })} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" disabled={updateSport.isPending} className="bg-accent hover:bg-accent-light text-white font-sans text-xs">
+              <Button type="submit" disabled={updateSport.isPending} className="w-full sm:w-auto bg-brand-900 hover:bg-brand-800 text-white font-medium">
                 {updateSport.isPending ? 'Saving…' : 'Save Changes'}
               </Button>
             </DialogFooter>
@@ -404,167 +405,168 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* DELETE SPORT CONFIRMATION */}
+      {/* Delete Sport Confirmation Modal */}
       <Dialog open={deleteSportDialog.open} onOpenChange={(open) => setDeleteSportDialog((prev) => ({ ...prev, open }))}>
-        <DialogContent className="max-w-sm w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-rose-600 flex items-center gap-2">
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="font-serif text-destructive font-bold text-lg flex items-center gap-2">
               <Trash2 className="h-5 w-5" />
               Delete Sport Program?
             </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete <strong>{deleteSportDialog.sport?.name}</strong>? This will also remove all its registered athletes, training sessions, and attendance history.
+            <DialogDescription className="text-muted-foreground text-sm">
+              Are you sure you want to delete <strong>{deleteSportDialog.sport?.name}</strong>? This action will permanently delete all associated athletes, training sessions, and attendance records.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => setDeleteSportDialog({ open: false, sport: null })}>
+          <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={() => setDeleteSportDialog({ open: false, sport: null })} className="w-full sm:w-auto">
               Cancel
             </Button>
             <Button
               type="button"
               onClick={handleDeleteSport}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-sans text-xs"
+              className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium"
             >
-              Delete Sport
+              Confirm Delete
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* EDIT PLAYER DIALOG */}
+      {/* Edit Player Modal */}
       <Dialog open={editPlayerDialog.open} onOpenChange={(open) => {
         if (!open) setEditPlayerDialog({ open: false, player: null, sportId: null })
       }}>
-        <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleUpdatePlayer}>
-            <DialogHeader>
-              <DialogTitle className="font-serif flex items-center gap-2">
-                <Pencil className="h-5 w-5 text-accent" />
-                Edit Player
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+                <Pencil className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                Edit Athlete
               </DialogTitle>
-              <DialogDescription>
-                Update the details for <strong>{editPlayerDialog.player?.fullName}</strong>.
+              <DialogDescription className="text-muted-foreground text-xs">
+                Update credentials for <strong>{editPlayerDialog.player?.fullName}</strong>.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3.5 my-4">
-              <div className="space-y-1">
-                <Label htmlFor="editPlayerFullName" className="text-xs font-sans text-slate-700">Full Name *</Label>
+
+            <div className="space-y-4 my-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="editPlayerFullName" className="text-xs font-semibold text-foreground">Full Name *</Label>
                 <Input
                   id="editPlayerFullName"
                   value={editPlayerForm.fullName}
                   onChange={(e) => setEditPlayerForm({ ...editPlayerForm, fullName: e.target.value })}
                   required
-                  className="h-8 text-xs font-sans"
+                  className="h-9 text-xs"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="editPlayerDob" className="text-xs font-sans text-slate-700">Date of Birth</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="editPlayerDob" className="text-xs font-semibold text-foreground">Date of Birth</Label>
                   <Input
                     id="editPlayerDob"
                     type="date"
                     value={editPlayerForm.dateOfBirth}
                     onChange={(e) => setEditPlayerForm({ ...editPlayerForm, dateOfBirth: e.target.value })}
-                    className="h-8 text-xs font-sans"
+                    className="h-9 text-xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="editPlayerJersey" className="text-xs font-sans text-slate-700">Jersey Number</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="editPlayerJersey" className="text-xs font-semibold text-foreground">Jersey #</Label>
                   <Input
                     id="editPlayerJersey"
                     type="number"
                     value={editPlayerForm.jerseyNumber}
                     onChange={(e) => setEditPlayerForm({ ...editPlayerForm, jerseyNumber: e.target.value })}
-                    className="h-8 text-xs font-sans"
+                    className="h-9 text-xs font-mono"
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="editPlayerPosition" className="text-xs font-sans text-slate-700">Position</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="editPlayerPosition" className="text-xs font-semibold text-foreground">Position</Label>
                   <Input
                     id="editPlayerPosition"
                     value={editPlayerForm.position}
                     onChange={(e) => setEditPlayerForm({ ...editPlayerForm, position: e.target.value })}
-                    placeholder="e.g. Striker, Bowler"
-                    className="h-8 text-xs font-sans"
+                    className="h-9 text-xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="editPlayerPhone" className="text-xs font-sans text-slate-700">Phone</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="editPlayerPhone" className="text-xs font-semibold text-foreground">Phone</Label>
                   <Input
                     id="editPlayerPhone"
                     value={editPlayerForm.phone}
                     onChange={(e) => setEditPlayerForm({ ...editPlayerForm, phone: e.target.value })}
-                    className="h-8 text-xs font-sans"
+                    className="h-9 text-xs font-mono"
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="editPlayerDepartment" className="text-xs font-sans text-slate-700">Department / Team</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="editPlayerDepartment" className="text-xs font-semibold text-foreground">Department / Team</Label>
                   <Input
                     id="editPlayerDepartment"
                     value={editPlayerForm.department}
                     onChange={(e) => setEditPlayerForm({ ...editPlayerForm, department: e.target.value })}
-                    placeholder="e.g. U-15, Senior Men"
-                    className="h-8 text-xs font-sans"
+                    className="h-9 text-xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="editPlayerEmail" className="text-xs font-sans text-slate-700">Email</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="editPlayerEmail" className="text-xs font-semibold text-foreground">Email</Label>
                   <Input
                     id="editPlayerEmail"
                     type="email"
                     value={editPlayerForm.email}
                     onChange={(e) => setEditPlayerForm({ ...editPlayerForm, email: e.target.value })}
-                    className="h-8 text-xs font-sans"
+                    className="h-9 text-xs"
                   />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans text-slate-700">Sport(s)</Label>
-                <div className="grid grid-cols-2 gap-2">
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-foreground">Program Assignment(s)</Label>
+                <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1 border border-border rounded-lg bg-muted/20">
                   {sports.map((sport) => {
                     const checked = editPlayerForm.sportIds.includes(sport.id)
                     return (
                       <label
                         key={sport.id}
-                        className={`flex items-center gap-2 px-2.5 py-2 rounded-md border cursor-pointer text-xs font-sans transition-colors ${
-                          checked ? 'border-accent bg-accent/5' : 'border-border bg-surface'
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border cursor-pointer text-xs font-medium transition-colors ${
+                          checked ? 'border-emerald-500/50 bg-emerald-500/10 text-foreground' : 'border-border bg-card text-muted-foreground'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleEditPlayerSport(sport.id)}
-                          className="accent-accent h-3.5 w-3.5"
+                          className="accent-emerald-600 h-3.5 w-3.5"
                         />
-                        <span className="flex-1 truncate">{sport.name}</span>
+                        <span className="truncate">{sport.name}</span>
                       </label>
                     )
                   })}
                 </div>
-                <p className="text-[11px] text-slate-400 font-sans">
-                  Optional — select all sports this athlete participates in.
-                </p>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="editPlayerNotes" className="text-xs font-sans text-slate-700">Notes</Label>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="editPlayerNotes" className="text-xs font-semibold text-foreground">Notes</Label>
                 <Input
                   id="editPlayerNotes"
                   value={editPlayerForm.notes}
                   onChange={(e) => setEditPlayerForm({ ...editPlayerForm, notes: e.target.value })}
-                  placeholder="Any additional notes…"
-                  className="h-8 text-xs font-sans"
+                  className="h-9 text-xs"
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditPlayerDialog({ open: false, player: null, sportId: null })}>
+
+            <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditPlayerDialog({ open: false, player: null, sportId: null })} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" disabled={updatePlayer.isPending} className="bg-accent hover:bg-accent-light text-white font-sans text-xs">
+              <Button type="submit" disabled={updatePlayer.isPending} className="w-full sm:w-auto bg-brand-900 hover:bg-brand-800 text-white font-medium">
                 {updatePlayer.isPending ? 'Saving…' : 'Save Changes'}
               </Button>
             </DialogFooter>
@@ -572,7 +574,7 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ASSIGN CAPTAIN (PROMOTE WITH CREDENTIALS) */}
+      {/* Assign Captain Modal */}
       <PromoteCaptainModal
         open={assignDialog.open}
         onOpenChange={(open) => setAssignDialog((prev) => ({ ...prev, open }))}
@@ -580,7 +582,7 @@ export default function AdminPage() {
         sportCaptains={assignSport?.captains ?? (assignSport?.captain ? [assignSport.captain] : [])}
       />
 
-      {/* PLAYER PROFILE SHEET (admin read-only) */}
+      {/* Player Profile Sheet */}
       <PlayerProfileSheet
         player={viewProfile?.player ?? null}
         sportId={viewProfile?.sportId ?? null}
@@ -624,95 +626,97 @@ function SportCard({
   const full = sportCaptains.length >= 3
 
   return (
-    <Card className="border border-border shadow-sm">
-      {/* Collapsed header */}
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-serif text-lg font-semibold text-brand-900 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-accent" />
-                  {sport.name}
-                </span>
+    <Card className="border border-border shadow-2xs overflow-hidden transition-all duration-150">
+      <CardContent className="p-5">
+        <div className="flex flex-col gap-4">
+          {/* Header Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <Activity className="h-4 w-4" />
+                </div>
+                <h3 className="font-serif text-lg font-bold text-foreground">{sport.name}</h3>
                 <StatusBadge status={sport.active ? 'ACTIVE' : 'INACTIVE'} />
               </div>
               {sport.description && (
-                <p className="text-xs font-sans text-slate-500 mt-1 line-clamp-1">{sport.description}</p>
+                <p className="text-xs font-sans text-muted-foreground line-clamp-1">{sport.description}</p>
               )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
-                <Crown className="h-3 w-3 text-emerald-600" />
-                {sportCaptains.length}/3 captains
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <Crown className="h-3.5 w-3.5" />
+                {sportCaptains.length}/3 Captains
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent border border-accent/20">
-                <Users className="h-3 w-3" />
-                {playersLoading ? '…' : players.length} enrolled
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <Users className="h-3.5 w-3.5" />
+                {playersLoading ? '…' : players.length} Athletes
               </span>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          {/* Action Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button
+                size="sm"
+                className="text-xs h-8 bg-brand-900 hover:bg-brand-800 text-white font-medium gap-1.5"
+                disabled={full || playersLoading || players.length === 0}
+                onClick={onAssignCaptain}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>{full ? 'Captains Full' : 'Assign Captain'}</span>
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs h-8 font-medium gap-1.5" onClick={onEditSport}>
+                <Pencil className="h-3.5 w-3.5" />
+                <span>Edit Program</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs h-8 font-medium text-muted-foreground hover:text-foreground"
+                onClick={onToggleActive}
+              >
+                {sport.active ? 'Deactivate' : 'Activate'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs h-8 text-destructive hover:bg-destructive/10 p-2"
+                onClick={onDeleteSport}
+                title="Delete Sport"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
             <Button
               size="sm"
-              className="text-xs h-7 bg-accent hover:bg-accent-light text-white font-sans gap-1"
-              disabled={full || playersLoading || players.length === 0}
-              onClick={onAssignCaptain}
-              title={full ? 'Max 3 captains reached' : !playersLoading && players.length === 0 ? 'Register athletes first' : undefined}
-            >
-              <UserPlus className="h-3 w-3" />
-              {full ? 'Assign Captain (Full)' : 'Assign Captain'}
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs h-7 font-sans gap-1" onClick={onEditSport}>
-              <Pencil className="h-3 w-3" />
-              Edit Sport
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-xs h-7 font-sans"
-              onClick={onToggleActive}
-            >
-              {sport.active ? 'Deactivate' : 'Activate'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-xs h-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50 p-1.5"
-              onClick={onDeleteSport}
-              title="Delete Sport"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-xs h-7 font-sans ml-auto"
+              variant="outline"
+              className="text-xs h-8 font-medium gap-1 border-border ml-auto"
               onClick={onToggle}
-              title={expanded ? 'Collapse' : 'Expand'}
             >
-              <Plus className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-45' : ''}`} />
-              <span className="hidden sm:inline">{expanded ? 'Hide' : 'Show'}</span>
+              <span>{expanded ? 'Collapse Details' : 'View Roster'}</span>
+              {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </Button>
           </div>
         </div>
 
-        {/* Expanded sections */}
+        {/* Collapsible Roster & Captain Details */}
         {expanded && (
-          <div className="mt-4 space-y-4 border-t border-dashed border-border pt-4">
-            {/* Captains section */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-serif font-semibold text-brand-700 uppercase tracking-wide">
-                  Captains ({sportCaptains.length}/{3})
+          <div className="mt-5 space-y-6 border-t border-border pt-5">
+            {/* Captains Sub-Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-wider">
+                  Program Captains ({sportCaptains.length}/3)
                 </span>
                 {!full && (
                   <Button
                     size="sm"
                     variant="outline"
-                    className="text-xs h-6 px-2"
+                    className="text-xs h-7 px-2.5 font-medium"
                     onClick={onAssignCaptain}
                     disabled={playersLoading || players.length === 0}
                   >
@@ -721,30 +725,31 @@ function SportCard({
                   </Button>
                 )}
               </div>
+
               {sportCaptains.length === 0 ? (
-                <p className="text-xs text-slate-400 font-sans italic">No captains assigned yet.</p>
+                <p className="text-xs text-muted-foreground font-sans italic py-2">No captains assigned yet.</p>
               ) : (
-                <div className="space-y-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {sportCaptains.map((cap) => (
                     <div
                       key={cap.id}
-                      className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2 rounded bg-surface border border-border"
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border"
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Crown className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Crown className="h-4 w-4 text-amber-500 shrink-0" />
                         <div className="min-w-0">
-                          <div className="text-xs font-medium text-brand-900 truncate">{cap.fullName}</div>
-                          {cap.email && <div className="text-xs font-mono text-slate-400 truncate">{cap.email}</div>}
+                          <div className="text-xs font-bold text-foreground truncate">{cap.fullName}</div>
+                          {cap.email && <div className="text-[11px] font-mono text-muted-foreground truncate">{cap.email}</div>}
                         </div>
                       </div>
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="text-xs h-7 px-2 text-rose-600 hover:text-rose-700 border-rose-200 hover:bg-rose-50 self-start sm:self-auto"
+                        variant="ghost"
+                        className="text-xs h-7 text-destructive hover:bg-destructive/10 p-1.5"
                         onClick={() => onDemote({ id: cap.id, fullName: cap.fullName, email: cap.email } as Player)}
+                        title="Demote Captain"
                       >
-                        <UserX className="h-3 w-3 sm:mr-1" />
-                        <span className="hidden sm:inline">Demote</span>
+                        <UserX className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   ))}
@@ -752,55 +757,51 @@ function SportCard({
               )}
             </div>
 
-            {/* Roster section */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-serif font-semibold text-brand-700 uppercase tracking-wide">
-                  Enrolled Athletes ({players.length})
-                </span>
-              </div>
+            {/* Enrolled Athletes Sub-Section */}
+            <div className="space-y-3">
+              <span className="text-xs font-mono font-bold text-muted-foreground uppercase tracking-wider block">
+                Enrolled Roster ({players.length})
+              </span>
+
               {playersLoading ? (
-                <p className="text-xs text-slate-400 font-sans">Loading players…</p>
+                <p className="text-xs text-muted-foreground font-sans">Loading athletes…</p>
               ) : players.length === 0 ? (
-                <p className="text-xs text-slate-400 font-sans italic">No athletes added yet.</p>
+                <p className="text-xs text-muted-foreground font-sans italic py-2">No athletes enrolled yet.</p>
               ) : (
-                <div className="space-y-1.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {players.map((player) => {
-                    const isCaptain = captainIds.has(player.id)
+                    const isCap = captainIds.has(player.id)
                     return (
                       <div
                         key={player.id}
-                        className="flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2 rounded bg-card border border-border"
+                        className="flex items-center justify-between p-3 rounded-lg bg-card border border-border hover:bg-muted/30 transition-colors"
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {isCaptain && <Crown className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />}
+                        <div className="flex items-center gap-3 min-w-0">
+                          {isCap && <Crown className="h-4 w-4 text-amber-500 shrink-0" />}
                           <div className="min-w-0">
-                            <div className="text-xs font-medium text-brand-900 truncate">{player.fullName}</div>
-                            <div className="text-xs font-mono text-slate-400">
-                              {player.jerseyNumber != null && (
-                                <span className="mr-2">#{player.jerseyNumber}</span>
-                              )}
-                              {player.position ? `${player.position}` : ''}
+                            <div className="text-xs font-bold text-foreground truncate">{player.fullName}</div>
+                            <div className="text-[11px] font-mono text-muted-foreground">
+                              {player.jerseyNumber != null && <span className="mr-2">#{player.jerseyNumber}</span>}
+                              {player.position ? player.position : 'Athlete'}
                               {player.department ? ` · ${player.department}` : ''}
                             </div>
                           </div>
                         </div>
-                        <div className="flex gap-1.5 flex-shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="text-xs h-7 px-2"
+                            variant="ghost"
+                            className="text-xs h-7 px-2 font-medium"
                             onClick={() => onViewProfile(player)}
                           >
-                            <Crown className="h-3 w-3 sm:mr-1 opacity-60" />
-                            <span className="hidden sm:inline">View Profile</span>
+                            Profile
                           </Button>
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-7 w-7 text-slate-400 hover:text-slate-600"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             onClick={() => onEditPlayer(player, sport.id)}
-                            title="Edit player details"
+                            title="Edit athlete details"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>

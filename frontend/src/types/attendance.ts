@@ -36,5 +36,6 @@ export interface BulkAttendancePayload {
   records: {
     playerId: number
     status: AttendanceStatus
+    remarks?: string
   }[]
 }
