@@ -57,7 +57,7 @@ export function PlayerProfileSheet({
                   {player.jerseyNumber || <User className="h-5 w-5 text-slate-400" />}
                 </div>
                 <div>
-                  <SheetTitle className="font-serif text-xl font-bold text-brand-900">
+                  <SheetTitle className="font-display text-xl font-bold text-brand-900">
                     {player.fullName}
                   </SheetTitle>
                   <p className="text-xs text-slate-500 font-sans mt-0.5">
@@ -197,7 +197,7 @@ function PlayerAttendanceHistory({ playerId }: { playerId: number }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="font-serif font-semibold text-brand-900 text-sm">Attendance History</h4>
+        <h4 className="font-display font-semibold text-brand-900 text-sm">Attendance History</h4>
         <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
           {summary?.presentCount ?? 0} Sessions Present
         </span>

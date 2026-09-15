@@ -59,7 +59,7 @@ export default function AttendanceCalendar({ sportId, selectedDate, onSelectDate
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-accent" />
-          <span className="font-serif text-sm font-semibold text-brand-900">{monthLabel}</span>
+          <span className="font-display text-sm font-semibold text-brand-900">{monthLabel}</span>
         </div>
         {sessionCount > 0 && (
           <span className="inline-flex items-center gap-1 text-[11px] font-mono text-accent bg-accent/10 px-2 py-0.5 rounded-full">

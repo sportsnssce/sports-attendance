@@ -117,7 +117,7 @@ export default function CustomSessionDialog({
       <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
         <form onSubmit={handleSubmit} noValidate>
           <DialogHeader>
-            <DialogTitle className="font-serif flex items-center gap-2">
+            <DialogTitle className="font-display flex items-center gap-2">
               <CalendarPlus className="h-5 w-5 text-accent" />
               Add Custom Session{sportName ? ` · ${sportName}` : ''}
             </DialogTitle>
@@ -136,7 +136,7 @@ export default function CustomSessionDialog({
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Sun className="h-4 w-4 text-amber-500" />
-                  <span className="font-serif font-medium text-sm text-brand-900">Morning</span>
+                  <span className="font-display font-medium text-sm text-brand-900">Morning</span>
                 </div>
                 <span className="text-xs font-mono text-slate-500">07:00 AM – 09:00 AM</span>
               </button>
@@ -147,7 +147,7 @@ export default function CustomSessionDialog({
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Moon className="h-4 w-4 text-indigo-500" />
-                  <span className="font-serif font-medium text-sm text-brand-900">Evening</span>
+                  <span className="font-display font-medium text-sm text-brand-900">Evening</span>
                 </div>
                 <span className="text-xs font-mono text-slate-500">04:30 PM – 06:30 PM</span>
               </button>

@@ -64,19 +64,10 @@ public class PlayerApiController {
         return ResponseEntity.ok(playerService.findAllBySport(sportId));
     }
 
-    /** GET /api/players — all players across all sports (admin + captains, scoped) */
+    /** GET /api/players — all players across all sports (admins and captains share the full directory) */
     @GetMapping("/players")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
-    public ResponseEntity<List<Player>> listAll(Authentication auth) {
-        if (auth != null && auth.isAuthenticated()) {
-            User me = userService.findByUsername(auth.getName());
-            if (me.getRole() == User.Role.ROLE_CAPTAIN) {
-                List<Sport> mySports = playerService.findCaptainSports(me);
-                List<Long> sportIds = mySports.stream().map(Sport::getId).toList();
-                if (sportIds.isEmpty()) return ResponseEntity.ok(List.of());
-                return ResponseEntity.ok(playerService.findAllBySports(sportIds));
-            }
-        }
+    public ResponseEntity<List<Player>> listAll() {
         return ResponseEntity.ok(playerService.findAllPlayers());
     }
 
@@ -88,7 +79,7 @@ public class PlayerApiController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
     public ResponseEntity<?> createPlayer(@RequestBody PlayerCreateRequest req, Authentication auth) {
         User me = userService.findByUsername(auth.getName());
-        // sportIds is optional and may be empty — a player can be registered with no sport memberships yet.
+        // At least one sport membership is required (enforced in PlayerService.createPlayer).
         assertSportsInScope(me, req.sportIds());
         try {
             Player created = playerService.createPlayer(null, req);
@@ -165,7 +156,7 @@ public class PlayerApiController {
     public void deletePlayer(@PathVariable Long id, Authentication auth) {
         User me = userService.findByUsername(auth.getName());
         Player existing = playerService.findById(id);
-        if (!isCaptainOfPlayer(me, existing)) {
+        if (!playerService.canDeleteRosterEntry(me, existing)) {
             throw new AccessDeniedException("You are not authorized to delete this player.");
         }
         playerService.delete(id);

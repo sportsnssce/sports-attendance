@@ -129,7 +129,7 @@ export default function AttendancePage() {
       {/* Page Heading & Program Selector Card */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-card border border-border p-6 rounded-xl shadow-2xs">
         <div className="space-y-1">
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
             Attendance Register
           </h1>
           <p className="text-muted-foreground text-sm font-sans">
@@ -146,7 +146,7 @@ export default function AttendancePage() {
             {isCaptain ? 'Assigned Discipline' : 'Active Discipline'}
           </Label>
           {isCaptain ? (
-            <div className="font-serif font-bold text-sm text-foreground bg-card px-3 py-2 rounded-md border border-border shadow-2xs">
+            <div className="font-display font-bold text-sm text-foreground bg-card px-3 py-2 rounded-md border border-border shadow-2xs">
               {currentSport?.name || 'Loading discipline…'}
             </div>
           ) : (
@@ -175,7 +175,7 @@ export default function AttendancePage() {
         <div className="bg-card border border-border rounded-xl p-5 shadow-2xs lg:sticky lg:top-20">
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
             <CalendarDays className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="font-serif font-bold text-base text-foreground">Program Calendar</h2>
+            <h2 className="font-display font-bold text-base text-foreground">Program Calendar</h2>
           </div>
           {selectedSportId ? (
             <AttendanceCalendar
@@ -197,7 +197,7 @@ export default function AttendancePage() {
               <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider block">
                 Selected Schedule
               </span>
-              <h2 className="font-serif text-xl font-bold text-foreground mt-0.5">{dateLabel}</h2>
+              <h2 className="font-display text-xl font-bold text-foreground mt-0.5">{dateLabel}</h2>
               <p className="text-xs text-muted-foreground font-sans mt-0.5">
                 {daySessionsLoading
                   ? 'Fetching daily roster sessions…'
@@ -268,7 +268,7 @@ export default function AttendancePage() {
       <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog((prev) => ({ ...prev, open }))}>
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <DialogHeader className="space-y-2">
-            <DialogTitle className="font-serif text-destructive font-bold text-lg flex items-center gap-2">
+            <DialogTitle className="font-display text-destructive font-bold text-lg flex items-center gap-2">
               <Trash2 className="h-5 w-5" />
               Delete Training Session?
             </DialogTitle>

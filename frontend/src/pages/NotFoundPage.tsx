@@ -6,7 +6,7 @@ export default function NotFoundPage() {
     <div className="flex min-h-[60vh] items-center justify-center px-6">
       <div className="text-center space-y-4">
         <AlertCircle className="h-16 w-16 text-slate-300 mx-auto" />
-        <h1 className="font-serif text-4xl font-bold text-brand-900">Page Not Found</h1>
+        <h1 className="font-display text-4xl font-bold text-brand-900">Page Not Found</h1>
         <p className="font-sans text-slate-600 text-lg">
           The page you're looking for doesn't exist or has been moved.
         </p>

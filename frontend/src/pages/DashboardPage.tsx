@@ -67,7 +67,7 @@ export default function DashboardPage() {
             <Sparkles className="h-3.5 w-3.5" />
             <span>Active Season</span>
           </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
             Executive Overview
           </h1>
           <p className="text-muted-foreground text-sm font-sans">
@@ -109,7 +109,7 @@ export default function DashboardPage() {
       <div className="bg-card border border-border rounded-xl shadow-2xs overflow-hidden">
         <div className="px-6 py-5 border-b border-border bg-muted/30 flex items-center justify-between">
           <div>
-            <h2 className="font-serif text-lg font-bold text-foreground tracking-tight">
+            <h2 className="font-display text-lg font-bold text-foreground tracking-tight">
               {isCaptain ? 'Your Scheduled Training Sessions' : 'Upcoming Training Sessions'}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -135,17 +135,17 @@ export default function DashboardPage() {
             <Table className="ledger-table w-full card-table">
               <TableHeader>
                 <TableRow className="bg-muted/50 border-b border-border">
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[200px]">Session Title</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[140px]">Sport Discipline</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[120px]">Date</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[140px]">Time</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[100px]">Status</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[200px]">Session Title</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[140px]">Sport Discipline</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[120px]">Date</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[140px]">Time</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[100px]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {upcomingSessions.map((session) => (
                   <TableRow key={session.id} className="hover:bg-muted/40 transition-colors">
-                    <TableCell data-label="Session" className="font-serif font-semibold text-foreground">
+                    <TableCell data-label="Session" className="font-display font-semibold text-foreground">
                       {session.title}
                     </TableCell>
                     <TableCell data-label="Sport">

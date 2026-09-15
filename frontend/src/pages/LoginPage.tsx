@@ -57,7 +57,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface flex">
       {/* Left panel — branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-900 flex-col justify-center px-16">
-        <h1 className="font-serif text-4xl font-bold text-white leading-tight mb-4">
+        <img
+          src="/clg-logo-white.png"
+          alt="NSS Sports Camp"
+          className="h-28 w-28 object-contain mb-8"
+        />
+        <h1 className="font-display text-4xl font-bold text-white leading-tight mb-4">
           University Athletics
         </h1>
         <p className="font-sans text-brand-700 text-lg leading-relaxed">
@@ -69,13 +74,17 @@ export default function LoginPage() {
       {/* Right panel — login form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <div className="lg:hidden mb-8">
-            <h1 className="font-serif text-2xl font-bold text-brand-900">Sports Camp Attendance</h1>
+          <div className="lg:hidden mb-8 flex flex-col items-center text-center">
+            <img src="/nss_logo.png" alt="NSS Sports Camp" className="h-16 w-16 object-contain mb-3" />
+            <h1 className="font-display text-2xl font-bold text-brand-900">Sports Camp Attendance</h1>
             <p className="text-slate-500 text-sm mt-1">Sign in to continue</p>
           </div>
 
           <div className="bg-card border border-border rounded-lg p-8 shadow-sm">
-            <h2 className="font-serif text-xl font-semibold text-brand-900 mb-6">
+            <div className="flex items-center justify-center mb-4">
+              <img src="/nss_logo.png" alt="NSS Sports Camp" className="h-20 w-20 object-contain" />
+            </div>
+            <h2 className="font-display text-xl font-semibold text-brand-900 mb-6">
               Sign In
             </h2>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   Table,
   TableBody,
@@ -29,7 +29,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { PlayerProfileSheet } from '@/components/shared/PlayerProfileSheet'
 import { PromoteCaptainModal } from '@/components/shared/PromoteCaptainModal'
-import { useSports, useMySports, usePlayers, useAddPlayer, useDeletePlayer, useUpdatePlayer, useAuth } from '@/hooks'
+import { useSports, useMySports, usePlayers, useAllPlayers, useAddPlayer, useDeletePlayer, useUpdatePlayer, useAuth } from '@/hooks'
 import { UserPlus, Trophy, Shield, Trash2, Pencil, Users, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { type Player } from '@/types'
@@ -44,7 +44,9 @@ export default function RosterPage() {
   const sports = isCaptain ? mySports : allSports
   const sportsLoading = isCaptain ? mySportsLoading : allSportsLoading
 
-  const [selectedSportId, setSelectedSportId] = useState<number | null>(null)
+  const mySportIds = useMemo(() => new Set(mySports.map((s) => s.id)), [mySports])
+
+  const [selectedSportId, setSelectedSportId] = useState<number | 'all' | null>(null)
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
   const [deletePlayerDialog, setDeletePlayerDialog] = useState<{ open: boolean; player: Player | null }>({
@@ -79,6 +81,7 @@ export default function RosterPage() {
   })
 
   useEffect(() => {
+    if (selectedSportId === 'all') return
     if (sports.length > 0) {
       if (selectedSportId === null || !sports.some(s => s.id === selectedSportId)) {
         setSelectedSportId(sports[0].id)
@@ -86,16 +89,28 @@ export default function RosterPage() {
     }
   }, [sports, selectedSportId])
 
-  const currentSport = sports.find((s) => s.id === selectedSportId)
-  const { data: players = [], isLoading: playersLoading } = usePlayers(selectedSportId ?? 0)
+  const showAll = selectedSportId === 'all'
+  const currentSport = showAll ? undefined : sports.find((s) => s.id === selectedSportId)
+  const { data: sportPlayers = [], isLoading: sportPlayersLoading } = usePlayers(
+    typeof selectedSportId === 'number' ? selectedSportId : 0
+  )
+  const { data: allPlayers = [], isLoading: allPlayersLoading } = useAllPlayers(showAll)
+  const players = showAll ? allPlayers : sportPlayers
+  const playersLoading = showAll ? allPlayersLoading : sportPlayersLoading
   const addPlayerMutation = useAddPlayer()
   const deletePlayerMutation = useDeletePlayer()
   const updatePlayerMutation = useUpdatePlayer()
 
   const [promoteOpen, setPromoteOpen] = useState(false)
 
+  const canDeletePlayer = (player: Player) =>
+    !isCaptain || (player.sports?.some((s) => mySportIds.has(s.id)) ?? false)
+
   const openAddPlayer = () => {
-    setPlayerForm((prev) => ({ ...prev, sportIds: [] }))
+    setPlayerForm((prev) => ({
+      ...prev,
+      sportIds: typeof selectedSportId === 'number' ? [selectedSportId] : [],
+    }))
     setAddPlayerOpen(true)
   }
 
@@ -123,9 +138,13 @@ export default function RosterPage() {
       toast.error('Please enter player full name.')
       return
     }
+    if (playerForm.sportIds.length === 0) {
+      toast.error('Select at least one sport program for the athlete.')
+      return
+    }
     try {
       await addPlayerMutation.mutateAsync({
-        sportId: selectedSportId,
+        sportId: typeof selectedSportId === 'number' ? selectedSportId : null,
         data: {
           fullName: playerForm.fullName.trim(),
           jerseyNumber: playerForm.jerseyNumber ? Number(playerForm.jerseyNumber) : undefined,
@@ -243,12 +262,14 @@ export default function RosterPage() {
       {/* Top Banner & Main Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card border border-border p-6 rounded-xl shadow-2xs">
         <div className="space-y-1">
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
             Athletes & Roster Management
           </h1>
           <p className="text-muted-foreground text-sm font-sans">
             {isCaptain
-              ? `Manage roster details for ${currentSport?.name || 'Assigned Sport'}`
+              ? showAll
+                ? 'Browse every athlete and add players from other programs to yours.'
+                : `Manage roster details for ${currentSport?.name || 'your sport'}`
               : 'Browse, register, and update active athlete rosters across all disciplines.'}
           </p>
         </div>
@@ -268,38 +289,49 @@ export default function RosterPage() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            <span className="font-serif text-sm font-bold text-foreground">
+            <span className="font-display text-sm font-bold text-foreground">
               {isCaptain ? 'Assigned Program:' : 'Select Program:'}
             </span>
           </div>
 
-          {isCaptain ? (
-            <span className="font-sans text-sm font-semibold text-foreground bg-muted px-3 py-1.5 rounded-md border border-border">
-              {currentSport?.name || 'Loading discipline…'}
-            </span>
-          ) : (
-            <Select
-              value={selectedSportId?.toString() ?? ''}
-              onValueChange={(v) => {
-                setSelectedSportId(Number(v))
-                setSelectedPlayer(null)
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-64 font-sans font-medium bg-card text-foreground border-border shadow-2xs">
-                <SelectValue placeholder={sports.length === 0 ? 'No sports assigned' : 'Choose a sport…'} />
-              </SelectTrigger>
-              <SelectContent>
-                {sports.map((sport) => (
-                  <SelectItem key={sport.id} value={sport.id.toString()} className="font-medium">
-                    {sport.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select
+            value={selectedSportId?.toString() ?? ''}
+            onValueChange={(v) => {
+              setSelectedSportId(v === 'all' ? 'all' : Number(v))
+              setSelectedPlayer(null)
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-64 font-sans font-medium bg-card text-foreground border-border shadow-2xs">
+              <SelectValue placeholder={sports.length === 0 ? 'No sports assigned' : 'Choose a sport…'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="font-medium">
+                All Players
+              </SelectItem>
+              {sports.map((sport) => (
+                <SelectItem key={sport.id} value={sport.id.toString()} className="font-medium">
+                  {sport.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {currentSport && (
+        {showAll ? (
+          <div className="flex flex-wrap items-center gap-4 text-xs font-sans border-t md:border-t-0 pt-3 md:pt-0 border-border">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Trophy className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>All Programs</span>
+            </div>
+            <span className="text-border hidden sm:inline">|</span>
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Users className="h-4 w-4 text-amber-500" />
+              <span>
+                Total Athletes: <strong className="text-foreground">{players.length}</strong>
+              </span>
+            </div>
+          </div>
+        ) : currentSport && (
           <div className="flex flex-wrap items-center gap-4 text-xs font-sans border-t md:border-t-0 pt-3 md:pt-0 border-border">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Shield className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -340,7 +372,7 @@ export default function RosterPage() {
           <div className="p-16 text-center space-y-4">
             <Users className="h-10 w-10 text-muted-foreground mx-auto" />
             <p className="text-muted-foreground font-sans text-sm font-medium">
-              No athletes registered for {currentSport?.name || 'this sport'} yet.
+              No athletes registered for {currentSport?.name || 'any program'} yet.
             </p>
             <Button
               onClick={openAddPlayer}
@@ -354,12 +386,12 @@ export default function RosterPage() {
             <Table className="ledger-table w-full card-table">
               <TableHeader>
                 <TableRow className="bg-muted/50 border-b border-border">
-                  <TableHead className="w-16 font-serif text-foreground font-semibold min-w-[50px]">#</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[160px]">Athlete Name</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[120px]">Position / Role</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[140px]">Contact</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold min-w-[90px]">Status</TableHead>
-                  <TableHead className="font-serif text-foreground font-semibold text-right min-w-[180px]">Actions</TableHead>
+                  <TableHead className="w-16 font-display text-foreground font-semibold min-w-[50px]">#</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[160px]">Athlete Name</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[120px]">Position / Role</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[140px]">Contact</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[90px]">Status</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold text-right min-w-[180px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -373,7 +405,7 @@ export default function RosterPage() {
                       {player.jerseyNumber ? `#${player.jerseyNumber}` : '—'}
                     </TableCell>
                     <TableCell data-label="Athlete Name">
-                      <div className="font-serif font-bold text-foreground text-sm">{player.fullName}</div>
+                      <div className="font-display font-bold text-foreground text-sm">{player.fullName}</div>
                       {player.notes && <div className="text-xs text-muted-foreground truncate max-w-xs">{player.notes}</div>}
                     </TableCell>
                     <TableCell data-label="Position" className="font-sans text-xs text-muted-foreground font-medium">
@@ -413,18 +445,20 @@ export default function RosterPage() {
                           <Pencil className="h-3.5 w-3.5 sm:mr-1" />
                           <span className="sm:hidden">Edit</span>
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-xs h-8 text-destructive hover:bg-destructive/10 p-2 w-full sm:w-auto"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeletePlayerDialog({ open: true, player })
-                          }}
-                          title="Delete Athlete"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {canDeletePlayer(player) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-xs h-8 text-destructive hover:bg-destructive/10 p-2 w-full sm:w-auto"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeletePlayerDialog({ open: true, player })
+                            }}
+                            title="Delete Athlete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -440,7 +474,7 @@ export default function RosterPage() {
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleAddPlayer}>
             <DialogHeader className="space-y-1">
-              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+              <DialogTitle className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
                 <UserPlus className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Register Athlete
               </DialogTitle>
@@ -534,7 +568,7 @@ export default function RosterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground">Program Assignment(s)</Label>
+                <Label className="text-xs font-semibold text-foreground">Program Assignment(s) *</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1 border border-border rounded-lg bg-muted/20">
                   {sports.map((sport) => {
                     const checked = playerForm.sportIds.includes(sport.id)
@@ -578,7 +612,7 @@ export default function RosterPage() {
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleUpdatePlayer}>
             <DialogHeader className="space-y-1">
-              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+              <DialogTitle className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
                 <Pencil className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Edit Athlete Roster
               </DialogTitle>
@@ -716,7 +750,7 @@ export default function RosterPage() {
       <Dialog open={deletePlayerDialog.open} onOpenChange={(open) => setDeletePlayerDialog((prev) => ({ ...prev, open }))}>
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <DialogHeader className="space-y-2">
-            <DialogTitle className="font-serif text-destructive font-bold text-lg flex items-center gap-2">
+            <DialogTitle className="font-display text-destructive font-bold text-lg flex items-center gap-2">
               <Trash2 className="h-5 w-5" />
               Remove Athlete from Roster?
             </DialogTitle>
@@ -746,10 +780,14 @@ export default function RosterPage() {
         sportName={currentSport?.name}
         open={!!selectedPlayer}
         onOpenChange={(open) => !open && setSelectedPlayer(null)}
-        showPromote
+        showPromote={!showAll}
         canPromote={(currentSport?.captains?.length ?? 0) < 3}
         onPromote={openPromoteModal}
-        onDeletePlayer={selectedPlayer ? () => setDeletePlayerDialog({ open: true, player: selectedPlayer }) : undefined}
+        onDeletePlayer={
+          selectedPlayer && canDeletePlayer(selectedPlayer)
+            ? () => setDeletePlayerDialog({ open: true, player: selectedPlayer })
+            : undefined
+        }
       />
 
       {/* Promote Captain Modal */}

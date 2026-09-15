@@ -14,23 +14,24 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 w-full bg-card/95 backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 flex items-center justify-between flex-shrink-0 transition-colors">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 md:hidden text-muted-foreground hover:text-foreground hover:bg-muted"
-          onClick={onMenuClick}
-          aria-label="Toggle Navigation Menu"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse hidden sm:block" />
-          <span className="font-serif text-foreground text-sm font-semibold tracking-tight">
-            {isAdmin ? 'Administration Portal' : 'Captain Portal'}
-          </span>
+<div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 md:hidden text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={onMenuClick}
+            aria-label="Toggle Navigation Menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <img src="/nss_logo.png" alt="NSS Sports Camp" className="h-8 w-8 object-contain" />
+            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse hidden sm:block" />
+            <span className="font-display text-foreground text-sm font-semibold tracking-tight">
+              {isAdmin ? 'Administration Portal' : 'Captain Portal'}
+            </span>
+          </div>
         </div>
-      </div>
 
       <div className="flex items-center gap-3">
         <div className="hidden sm:flex flex-col text-right">

@@ -118,7 +118,7 @@ export default function ProfilePage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="font-serif text-2xl font-semibold text-brand-900">My Profile</h1>
+          <h1 className="font-display text-2xl font-semibold text-brand-900">My Profile</h1>
           <p className="text-slate-500 text-sm font-sans mt-1">Your account details and security</p>
         </div>
         <LoadingSkeleton type="table" count={4} />
@@ -134,7 +134,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="font-serif text-2xl font-semibold text-brand-900">My Profile</h1>
+        <h1 className="font-display text-2xl font-semibold text-brand-900">My Profile</h1>
         <p className="text-slate-500 text-sm font-sans mt-1">
           <span className="font-medium text-brand-800">{me?.username}</span> ·{' '}
           {me?.role === 'ROLE_ADMIN' ? 'Administrator' : 'Captain'}
@@ -146,7 +146,7 @@ export default function ProfilePage() {
           {/* Account details (editable for admins) */}
           <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="font-serif text-lg font-semibold text-brand-900 flex items-center gap-2">
+              <CardTitle className="font-display text-lg font-semibold text-brand-900 flex items-center gap-2">
                 <UserCircle className="h-5 w-5 text-accent" />
                 Account Details
               </CardTitle>
@@ -221,7 +221,7 @@ export default function ProfilePage() {
             {/* Program enrollments */}
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="font-serif text-lg font-semibold text-brand-900 flex items-center gap-2">
+                <CardTitle className="font-display text-lg font-semibold text-brand-900 flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-accent" />
                   My Program Enrollments
                 </CardTitle>
@@ -261,7 +261,7 @@ export default function ProfilePage() {
             {/* Change password */}
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="font-serif text-lg font-semibold text-brand-900 flex items-center gap-2">
+                <CardTitle className="font-display text-lg font-semibold text-brand-900 flex items-center gap-2">
                   <KeyRound className="h-5 w-5 text-accent" />
                   Change Password
                 </CardTitle>
@@ -322,7 +322,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="font-serif text-lg font-semibold text-brand-900 flex items-center gap-2">
+              <CardTitle className="font-display text-lg font-semibold text-brand-900 flex items-center gap-2">
                 <UserIcon className="h-5 w-5 text-accent" />
                 Player Details
               </CardTitle>
@@ -378,7 +378,7 @@ export default function ProfilePage() {
 
           <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="font-serif text-lg font-semibold text-brand-900 flex items-center gap-2">
+              <CardTitle className="font-display text-lg font-semibold text-brand-900 flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-accent" />
                 Enrolled Sports
               </CardTitle>

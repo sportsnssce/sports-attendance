@@ -121,7 +121,7 @@ export function PromoteCaptainModal({
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-serif flex items-center gap-2">
+          <DialogTitle className="font-display flex items-center gap-2">
             <Crown className="h-5 w-5 text-accent" />
             {activePlayer && !preselectedPlayer ? 'Assign Captain' : 'Promote to Captain'}
           </DialogTitle>
@@ -208,7 +208,7 @@ export function PromoteCaptainModal({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <Crown className="h-4 w-4 text-amber-500 shrink-0" />
-                <span className="text-sm font-serif font-semibold text-brand-900 truncate">
+                <span className="text-sm font-display font-semibold text-brand-900 truncate">
                   {activePlayer ? `Captain login for ${activePlayer.fullName}` : 'Captain credentials'}
                 </span>
               </div>

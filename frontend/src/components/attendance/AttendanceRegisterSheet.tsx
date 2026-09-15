@@ -129,7 +129,7 @@ function RegisterBody({
   return (
     <SheetContent className="flex w-full max-w-xl flex-col gap-4">
       <SheetHeader className="text-left">
-        <SheetTitle className="font-serif">{session.title}</SheetTitle>
+        <SheetTitle className="font-display">{session.title}</SheetTitle>
         <SheetDescription className="flex items-center gap-1.5">
           <CalendarClock className="h-3.5 w-3.5" />
           {session.sessionDate} · {timeRange}
@@ -152,7 +152,7 @@ function RegisterBody({
                 <div key={p.id} className={i > 0 ? 'border-t border-border/60 py-3' : 'py-3'}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-serif font-medium text-brand-900 truncate">{p.fullName}</div>
+                      <div className="font-display font-medium text-brand-900 truncate">{p.fullName}</div>
                       <div className="text-[11px] font-sans text-slate-500">
                         {p.position || 'Athlete'}
                         {p.jerseyNumber != null && ` · #${p.jerseyNumber}`}

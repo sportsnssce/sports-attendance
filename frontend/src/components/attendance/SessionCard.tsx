@@ -32,7 +32,7 @@ export default function SessionCard({ session, totalPlayers, canDelete, onOpen, 
         className="w-full px-4 py-3 pr-12 text-left hover:bg-surface/60 transition-colors"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-serif font-semibold text-brand-900 truncate">{session.title}</span>
+          <span className="font-display font-semibold text-brand-900 truncate">{session.title}</span>
           <StatusBadge status={session.status} />
         </div>
         <div className="flex items-center gap-3 mt-1">

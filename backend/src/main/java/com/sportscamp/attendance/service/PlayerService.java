@@ -92,8 +92,9 @@ public class PlayerService {
         Set<Long> sportIds = new LinkedHashSet<>();
         if (primarySportId != null) sportIds.add(primarySportId);
         if (req.sportIds() != null) sportIds.addAll(req.sportIds());
-        // Sport memberships are optional: a player may be registered with zero,
-        // one, or several sports (assignment can happen later via update).
+        if (sportIds.isEmpty()) {
+            throw new IllegalArgumentException("A player must be registered to at least one sport.");
+        }
 
         Player player = new Player();
         applyBaseFields(player, req);
@@ -297,15 +298,26 @@ public class PlayerService {
     }
 
     /**
-     * Can this user manage the given player? True for admins, or for a captain who captains at
-     * least one sport the player participates in. Interim rule — revisit in Phase 2.
+     * Can this user view and edit the given player? Admins can do anything; captains may
+     * browse and update the entire athlete directory so they can add a player from another
+     * sport to their own program (captaincy-heavy interim rule — revisit in Phase 2).
      */
     public boolean canManage(User user, Player target) {
         if (user == null) return false;
         if (user.getRole() == User.Role.ROLE_ADMIN) return true;
+        return user.getRole() == User.Role.ROLE_CAPTAIN;
+    }
+
+    /**
+     * Can this user remove the given player from a roster? Admins may delete any player;
+     * captains may only delete players who participate in at least one sport they captain
+     * (they manage their own programs, not other sports' rosters).
+     */
+    public boolean canDeleteRosterEntry(User user, Player target) {
+        if (user == null) return false;
+        if (user.getRole() == User.Role.ROLE_ADMIN) return true;
         Long myPlayerId = findLinkedPlayer(user).map(Player::getId).orElse(null);
         if (myPlayerId == null || target == null) return false;
-        return target.getSports().stream()
-                .anyMatch(s -> s.hasCaptainByPlayerId(myPlayerId));
+        return target.getSports().stream().anyMatch(s -> s.hasCaptainByPlayerId(myPlayerId));
     }
 }

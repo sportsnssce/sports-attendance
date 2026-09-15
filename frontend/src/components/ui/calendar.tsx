@@ -22,7 +22,7 @@ function Calendar({ className, classNames, components, showOutsideDays = true, .
         month: 'w-full',
         month_caption: 'flex justify-center pt-1 relative items-center h-9',
         hidden: 'invisible',
-        caption_label: 'font-serif text-sm font-semibold text-brand-900',
+        caption_label: 'font-display text-sm font-semibold text-brand-900',
         nav: 'space-x-1 flex items-center z-10',
         button_previous: cn(buttonVariants({ variant: 'ghost' }), 'h-7 w-7 p-0 opacity-70 hover:opacity-100 absolute left-1'),
         button_next: cn(buttonVariants({ variant: 'ghost' }), 'h-7 w-7 p-0 opacity-70 hover:opacity-100 absolute right-1'),

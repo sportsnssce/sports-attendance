@@ -10,10 +10,11 @@ export function usePlayers(sportId: number) {
   })
 }
 
-export function useAllPlayers() {
+export function useAllPlayers(enabled: boolean = true) {
   return useQuery({
     queryKey: ['players', 'all'],
     queryFn: () => api.get('/api/players').then((r) => r.data as Player[]),
+    enabled,
   })
 }
 

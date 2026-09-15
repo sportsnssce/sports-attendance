@@ -299,7 +299,7 @@ export default function AdminPage() {
       {/* Top Banner & Main Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card border border-border p-6 rounded-xl shadow-2xs">
         <div className="space-y-1">
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
             System Administration
           </h1>
           <p className="text-muted-foreground text-sm font-sans">
@@ -367,7 +367,7 @@ export default function AdminPage() {
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <form onSubmit={handleCreateSport}>
             <DialogHeader className="space-y-1">
-              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+              <DialogTitle className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
                 <Trophy className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Add Sport Program
               </DialogTitle>
@@ -417,7 +417,7 @@ export default function AdminPage() {
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <form onSubmit={handleUpdateSport}>
             <DialogHeader className="space-y-1">
-              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+              <DialogTitle className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
                 <Pencil className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Edit Sport Program
               </DialogTitle>
@@ -473,7 +473,7 @@ export default function AdminPage() {
       <Dialog open={deleteSportDialog.open} onOpenChange={(open) => setDeleteSportDialog((prev) => ({ ...prev, open }))}>
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <DialogHeader className="space-y-2">
-            <DialogTitle className="font-serif text-destructive font-bold text-lg flex items-center gap-2">
+            <DialogTitle className="font-display text-destructive font-bold text-lg flex items-center gap-2">
               <Trash2 className="h-5 w-5" />
               Delete Sport Program?
             </DialogTitle>
@@ -503,7 +503,7 @@ export default function AdminPage() {
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card max-h-[85vh] overflow-y-auto">
           <form onSubmit={handleUpdatePlayer}>
             <DialogHeader className="space-y-1">
-              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+              <DialogTitle className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
                 <Pencil className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Edit Athlete
               </DialogTitle>
@@ -660,7 +660,7 @@ export default function AdminPage() {
         <DialogContent className="max-w-md w-[calc(100vw-2rem)] rounded-xl border-border bg-card">
           <form onSubmit={handleSaveCredentials}>
             <DialogHeader className="space-y-1">
-              <DialogTitle className="font-serif font-bold text-lg flex items-center gap-2 text-foreground">
+              <DialogTitle className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
                 <KeyRound className="h-5 w-5 text-amber-500" />
                 Captain Credentials
               </DialogTitle>
@@ -764,7 +764,7 @@ function SportCard({
                 <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                   <Activity className="h-4 w-4" />
                 </div>
-                <h3 className="font-serif text-lg font-bold text-foreground">{sport.name}</h3>
+                <h3 className="font-display text-lg font-bold text-foreground">{sport.name}</h3>
                 <StatusBadge status={sport.active ? 'ACTIVE' : 'INACTIVE'} />
               </div>
               {sport.description && (

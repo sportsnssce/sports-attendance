@@ -5,9 +5,10 @@ import java.util.Set;
 
 /**
  * Request body for creating or updating a player. {@code sportIds} is nullable:
- * on create it adds to the roster sports (a primary path-variable sport is merged by the
- * controller when present); on update {@code null} means "leave memberships untouched",
- * whereas a provided (possibly empty) set replaces the player's sport memberships.
+ * on create it is REQUIRED to yield at least one sport (a primary path-variable sport is
+ * merged by the controller when present, otherwise {@code sportIds} must not be empty);
+ * on update {@code null} means "leave memberships untouched", whereas a provided (possibly
+ * empty) set replaces the player's sport memberships.
  */
 public record PlayerCreateRequest(
         String fullName,

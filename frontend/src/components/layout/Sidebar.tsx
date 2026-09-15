@@ -8,7 +8,6 @@ import {
   Settings,
   LogOut,
   UserRound,
-  Trophy,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -51,11 +50,13 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       <div className="flex flex-col gap-6 p-4">
         {/* Logo area */}
         <div className="flex items-center gap-3 px-2 py-3 border-b border-brand-800">
-          <div className="h-9 w-9 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
-            <Trophy className="h-5 w-5" />
-          </div>
+          <img
+            src="/clg-logo-white.png"
+            alt="NSS Sports Camp"
+            className="h-10 w-10 object-contain"
+          />
           <div className="flex flex-col">
-            <h1 className="font-serif font-bold text-base tracking-wide text-white leading-none">
+            <h1 className="font-display font-bold text-base tracking-wide text-white leading-none">
               Sports Camp
             </h1>
             <span className="font-mono text-[11px] text-slate-400 mt-1 uppercase tracking-wider">
