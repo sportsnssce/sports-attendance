@@ -4,7 +4,7 @@ import com.sportscamp.attendance.entity.Attendance;
 import com.sportscamp.attendance.entity.Attendance.AttendanceStatus;
 import com.sportscamp.attendance.dto.PlayerAttendanceDTO;
 import com.sportscamp.attendance.dto.SessionAttendanceCountDTO;
-import com.sportscamp.attendance.dto.AttendanceExportDTO;
+import com.sportscamp.attendance.dto.DailyAttendanceExportDTO;
 import com.sportscamp.attendance.dto.SportAttendanceSummaryDTO;
 import com.sportscamp.attendance.dto.DailyAttendanceExportDTO;
 import com.sportscamp.attendance.entity.Player;
