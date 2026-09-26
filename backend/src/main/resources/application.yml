@@ -1,21 +1,20 @@
 spring:
+  main:
+    lazy-initialization: true
+
   application:
     name: sports-attendance
 
   datasource:
-    # Supabase connection pooler (port 6543) — use this for the running app
-    # Format: jdbc:postgresql://aws-0-<region>.pooler.supabase.com:6543/postgres
-    # prepareThreshold=0 disables pgjdbc server-side prepared statements, which are
-    # incompatible with PgBouncer running in transaction mode (sporadic 500s).
     url: ${DB_URL}&prepareThreshold=0
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 5
+      minimum-idle: 1
       connection-timeout: 30000
-      # Required for Supabase connection pooler (PgBouncer in transaction mode)
       connection-init-sql: SELECT 1
 
   jpa:
@@ -24,7 +23,6 @@ spring:
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc:
           batch_size: 50
@@ -37,7 +35,6 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: false
-    # prepareThreshold=0 required for Supabase PgBouncer pooler (transaction mode)
     url: ${DB_URL}&prepareThreshold=0
     user: ${DB_USERNAME}
     password: ${DB_PASSWORD}
@@ -48,18 +45,14 @@ spring:
 
   security:
     user:
-      name: admin   # fallback only; real users come from DB
+      name: admin
 
 app:
   cors:
-    # Comma-separated list of allowed browser origins. Add your Vercel (or other
-    # frontend) origin here via the CORS_ALLOWED_ORIGINS env var on Render.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,https://sportsnssce.vercel.app}
 
   keep-alive:
-    # RENDER_EXTERNAL_URL is injected automatically by Render (e.g. https://my-app.onrender.com).
-    # When the variable is absent (local dev) the feature stays disabled.
-    enabled: ${RENDER_EXTERNAL_URL:false}
+    enabled: ${KEEP_ALIVE_ENABLED:false}
     url: ${RENDER_EXTERNAL_URL:http://localhost:8080}/actuator/health
 
 server:
