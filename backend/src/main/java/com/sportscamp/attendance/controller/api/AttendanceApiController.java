@@ -2,6 +2,11 @@ package com.sportscamp.attendance.controller.api;
 
 import com.sportscamp.attendance.entity.Attendance;
 import com.sportscamp.attendance.entity.Attendance.AttendanceStatus;
+import com.sportscamp.attendance.dto.PlayerAttendanceDTO;
+import com.sportscamp.attendance.dto.SessionAttendanceCountDTO;
+import com.sportscamp.attendance.dto.AttendanceExportDTO;
+import com.sportscamp.attendance.dto.SportAttendanceSummaryDTO;
+import com.sportscamp.attendance.dto.DailyAttendanceExportDTO;
 import com.sportscamp.attendance.entity.Player;
 import com.sportscamp.attendance.entity.TrainingSession;
 import com.sportscamp.attendance.entity.User;
@@ -54,7 +59,7 @@ public class AttendanceApiController {
 
     /** GET /api/players/{playerId}/attendance */
     @GetMapping("/players/{playerId}/attendance")
-    public ResponseEntity<List<Attendance>> getByPlayer(@PathVariable Long playerId, Authentication auth) {
+    public ResponseEntity<List<PlayerAttendanceDTO>> getByPlayer(@PathVariable Long playerId, Authentication auth) {
         if (auth != null && auth.isAuthenticated()) {
             User me = userService.findByUsername(auth.getName());
             Player player = playerService.findById(playerId);
@@ -62,7 +67,50 @@ public class AttendanceApiController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
         }
-        return ResponseEntity.ok(attendanceService.findByPlayer(playerId));
+        return ResponseEntity.ok(attendanceService.findPlayerAttendance(playerId));
+    }
+
+    /** Batched present + late counts for visible session cards. */
+    @GetMapping("/sports/{sportId}/sessions/attendance-counts")
+    public ResponseEntity<List<SessionAttendanceCountDTO>> countsBySessions(
+            @PathVariable Long sportId,
+            @RequestParam List<Long> sessionIds,
+            Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (me.getRole() != User.Role.ROLE_ADMIN && !playerService.isCaptain(me, sportId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        return ResponseEntity.ok(attendanceService.countPresentBySessions(sportId, sessionIds));
+    }
+
+        /** Export one day's full sport roster and attendance as flat CSV-ready rows. */
+    @GetMapping("/sports/{sportId}/attendance/export")
+        public ResponseEntity<List<DailyAttendanceExportDTO>> exportSportAttendance(
+            @PathVariable Long sportId,
+            @RequestParam java.time.LocalDate date,
+            Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (me.getRole() != User.Role.ROLE_ADMIN && !playerService.isCaptain(me, sportId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        return ResponseEntity.ok(attendanceService.exportBySportAndDate(sportId, date));
+    }
+
+    /** Per-player totals for one sport; sessions marked as holiday are not counted. */
+    @GetMapping("/sports/{sportId}/attendance/summary")
+    public ResponseEntity<List<SportAttendanceSummaryDTO>> sportAttendanceSummary(
+            @PathVariable Long sportId, Authentication auth) {
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (me.getRole() != User.Role.ROLE_ADMIN && !playerService.isCaptain(me, sportId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        return ResponseEntity.ok(attendanceService.summarizeBySport(sportId));
     }
 
     /**
@@ -81,6 +129,9 @@ public class AttendanceApiController {
         TrainingSession session = sessionService.findById(sessionId);
         if (!isCaptainOfSession(me, session)) {
             throw new AccessDeniedException("You are not authorized to record attendance for this sport.");
+        }
+        if (session.getStatus() == TrainingSession.SessionStatus.HOLIDAY) {
+            return ResponseEntity.badRequest().build();
         }
 
         Map<Long, AttendanceService.AttendanceDraft> drafts = new HashMap<>();

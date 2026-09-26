@@ -21,8 +21,8 @@ function makeSessionDayButton(sessionDates: Set<string>) {
       <DayButton
         day={day}
         className={cn(
-          'relative h-9 w-9 p-0 font-normal aria-selected:opacity-100',
-          hasSessions && 'after:absolute after:bottom-0.5 after:left-1/2 after:h-1.5 after:w-1.5 after:-translate-x-1/2 after:rounded-full after:bg-accent after:shadow-[0_0_6px_theme(colors.accent)]',
+          'relative isolate h-9 w-9 cursor-pointer p-0 font-normal aria-selected:bg-accent aria-selected:text-white aria-selected:hover:bg-accent',
+          hasSessions && 'after:pointer-events-none after:absolute after:bottom-1 after:left-1/2 after:z-10 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-current',
           className,
         )}
         {...rest}

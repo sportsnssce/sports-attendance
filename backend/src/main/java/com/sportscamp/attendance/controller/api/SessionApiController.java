@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -33,6 +35,22 @@ public class SessionApiController {
 
     private boolean isCaptainOfSession(User user, TrainingSession session) {
         return playerService.isCaptainOfSport(user, session.getSport());
+    }
+
+    /** GET /api/sessions/upcoming — only upcoming scheduled/in-progress sessions. */
+    @GetMapping("/sessions/upcoming")
+    public List<TrainingSession> listUpcoming(Authentication auth) {
+        LocalDate today = LocalDate.now();
+        if (auth != null && auth.isAuthenticated()) {
+            User me = userService.findByUsername(auth.getName());
+            if (me.getRole() == User.Role.ROLE_CAPTAIN) {
+                List<Long> sportIds = playerService.findCaptainSports(me).stream()
+                        .map(Sport::getId)
+                        .collect(Collectors.toList());
+                return sessionService.findUpcomingBySportIds(sportIds, today);
+            }
+        }
+        return sessionService.findUpcoming(today);
     }
 
     /** GET /api/sessions — all sessions (scoped to captain's assigned sports if captain) */

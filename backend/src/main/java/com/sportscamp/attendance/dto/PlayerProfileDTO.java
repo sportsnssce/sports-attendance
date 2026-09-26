@@ -15,6 +15,7 @@ public record PlayerProfileDTO(
         String email,
         String phone,
         String department,
+        String year,
         boolean isCaptain,
         List<SportInfo> captainSports,
         List<SportInfo> sports,

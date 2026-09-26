@@ -18,6 +18,7 @@ public record PlayerCreateRequest(
         String phone,
         String email,
         String department,
+        String year,
         String notes,
         Boolean active,
         Set<Long> sportIds

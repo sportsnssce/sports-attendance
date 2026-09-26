@@ -25,6 +25,7 @@ const sessionStatusColors: Record<string, string> = {
   IN_PROGRESS: 'bg-accent/10 text-accent border-accent/30',
   COMPLETED: 'bg-blue-100 text-blue-800 border-blue-200',
   CANCELLED: 'bg-red-100 text-red-800 border-red-200',
+  HOLIDAY: 'bg-amber-100 text-amber-900 border-amber-300',
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
@@ -39,7 +40,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
           className
         )}
       >
-        {normalized}
+        {normalized === 'LATE' ? 'Present(I)' : normalized}
       </span>
     )
   }

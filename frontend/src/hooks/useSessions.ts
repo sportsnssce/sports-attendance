@@ -9,6 +9,13 @@ export function useAllSessions() {
   })
 }
 
+export function useUpcomingSessions() {
+  return useQuery({
+    queryKey: ['sessions', 'upcoming'],
+    queryFn: () => api.get('/api/sessions/upcoming').then((r) => r.data as Session[]),
+  })
+}
+
 export interface SessionQuery {
   /** Single date (YYYY-MM-DD) — auto-creates default Morning/Evening if none exist. */
   date?: string

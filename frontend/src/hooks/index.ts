@@ -24,21 +24,28 @@ export {
   usePlayer,
   usePlayerProfile,
   useAddPlayer,
+  useAddExistingPlayerToSports,
   useUpdatePlayer,
   useDeletePlayer,
+  useRemovePlayerFromSport,
   usePromotePlayerToCaptain,
   useDemoteCaptain,
   useAllPlayers,
+  useSearchPlayers,
 } from './usePlayers'
 export {
   useSessions,
   useAllSessions,
+  useUpcomingSessions,
   useCreateSession,
   useUpdateSessionStatus,
   useDeleteSession,
 } from './useSessions'
 export {
   useAttendance,
+  useSessionAttendanceCounts,
+  useExportSportAttendance,
+  useExportSportAttendanceSummary,
   useBulkSubmitAttendance,
   useUpdateAttendanceRecord,
   usePlayerAttendance,

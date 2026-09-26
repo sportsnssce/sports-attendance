@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import {
   Table,
   TableBody,
@@ -29,7 +29,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { PlayerProfileSheet } from '@/components/shared/PlayerProfileSheet'
 import { PromoteCaptainModal } from '@/components/shared/PromoteCaptainModal'
-import { useSports, useMySports, usePlayers, useAllPlayers, useAddPlayer, useDeletePlayer, useUpdatePlayer, useAuth } from '@/hooks'
+import { useSports, useMySports, usePlayers, useAllPlayers, useSearchPlayers, useAddPlayer, useAddExistingPlayerToSports, useDeletePlayer, useRemovePlayerFromSport, useUpdatePlayer, useAuth } from '@/hooks'
 import { UserPlus, Trophy, Shield, Trash2, Pencil, Users, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { type Player } from '@/types'
@@ -39,7 +39,7 @@ export default function RosterPage() {
   const isCaptain = role === 'ROLE_CAPTAIN'
 
   const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)
-  const { data: mySports = [], isLoading: mySportsLoading } = useMySports()
+  const { data: mySports = [], isLoading: mySportsLoading } = useMySports(isCaptain)
 
   const sports = isCaptain ? mySports : allSports
   const sportsLoading = isCaptain ? mySportsLoading : allSportsLoading
@@ -48,6 +48,8 @@ export default function RosterPage() {
 
   const [selectedSportId, setSelectedSportId] = useState<number | 'all' | null>(null)
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
+  const [selectedExistingPlayer, setSelectedExistingPlayer] = useState<Player | null>(null)
+  const addSubmitLock = useRef(false)
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
   const [deletePlayerDialog, setDeletePlayerDialog] = useState<{ open: boolean; player: Player | null }>({
     open: false,
@@ -62,6 +64,7 @@ export default function RosterPage() {
     dateOfBirth: '',
     jerseyNumber: '',
     position: '',
+    year: '',
     phone: '',
     email: '',
     department: '',
@@ -71,14 +74,21 @@ export default function RosterPage() {
 
   const [playerForm, setPlayerForm] = useState({
     fullName: '',
+    dateOfBirth: '',
     jerseyNumber: '',
-    position: '',
+    year: '',
     phone: '',
     email: '',
     department: '',
     notes: '',
     sportIds: [] as number[],
   })
+  const [duplicateSearchName, setDuplicateSearchName] = useState('')
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDuplicateSearchName(playerForm.fullName.trim()), 250)
+    return () => window.clearTimeout(timer)
+  }, [playerForm.fullName])
 
   useEffect(() => {
     if (selectedSportId === 'all') return
@@ -95,20 +105,31 @@ export default function RosterPage() {
     typeof selectedSportId === 'number' ? selectedSportId : 0
   )
   const { data: allPlayers = [], isLoading: allPlayersLoading } = useAllPlayers(showAll)
+  const { data: duplicateMatches = [], isLoading: duplicateCheckLoading } = useSearchPlayers(duplicateSearchName, addPlayerOpen)
   const players = showAll ? allPlayers : sportPlayers
   const playersLoading = showAll ? allPlayersLoading : sportPlayersLoading
+  const duplicateSearchCurrent = duplicateSearchName.toLocaleLowerCase() === playerForm.fullName.trim().toLocaleLowerCase()
   const addPlayerMutation = useAddPlayer()
+  const addExistingPlayerMutation = useAddExistingPlayerToSports()
   const deletePlayerMutation = useDeletePlayer()
+  const removePlayerFromSportMutation = useRemovePlayerFromSport()
   const updatePlayerMutation = useUpdatePlayer()
 
   const [promoteOpen, setPromoteOpen] = useState(false)
 
-  const canDeletePlayer = (player: Player) =>
-    !isCaptain || (player.sports?.some((s) => mySportIds.has(s.id)) ?? false)
+  const canDeletePlayer = (player: Player) => {
+    if (typeof selectedSportId === 'number') {
+      return (!isCaptain || mySportIds.has(selectedSportId)) &&
+        (player.sports?.some((sport) => sport.id === selectedSportId) ?? false)
+    }
+    return !isCaptain && showAll
+  }
 
   const openAddPlayer = () => {
+    setSelectedExistingPlayer(null)
     setPlayerForm((prev) => ({
       ...prev,
+      fullName: '',
       sportIds: typeof selectedSportId === 'number' ? [selectedSportId] : [],
     }))
     setAddPlayerOpen(true)
@@ -134,43 +155,66 @@ export default function RosterPage() {
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (addSubmitLock.current || addPlayerMutation.isPending || addExistingPlayerMutation.isPending) return
     if (!playerForm.fullName.trim()) {
       toast.error('Please enter player full name.')
+      return
+    }
+    if (playerForm.fullName.trim().length >= 2 && (!duplicateSearchCurrent || duplicateCheckLoading)) {
+      toast.info('Checking the directory for matching players. Try again in a moment.')
       return
     }
     if (playerForm.sportIds.length === 0) {
       toast.error('Select at least one sport program for the athlete.')
       return
     }
+    const exactMatch = duplicateMatches.find(
+      (player) => player.fullName.trim().toLocaleLowerCase() === playerForm.fullName.trim().toLocaleLowerCase()
+    )
+    if (exactMatch && !selectedExistingPlayer) {
+      toast.error('This exact name is already registered. Select the existing player to add them to another sport.')
+      return
+    }
+    addSubmitLock.current = true
     try {
-      await addPlayerMutation.mutateAsync({
-        sportId: typeof selectedSportId === 'number' ? selectedSportId : null,
-        data: {
-          fullName: playerForm.fullName.trim(),
-          jerseyNumber: playerForm.jerseyNumber ? Number(playerForm.jerseyNumber) : undefined,
-          position: playerForm.position.trim(),
-          phone: playerForm.phone.trim(),
-          email: playerForm.email.trim(),
-          department: playerForm.department.trim() || undefined,
-          notes: playerForm.notes.trim(),
-          active: true,
+      if (selectedExistingPlayer) {
+        await addExistingPlayerMutation.mutateAsync({
+          playerId: selectedExistingPlayer.id,
           sportIds: playerForm.sportIds,
-        },
-      })
+        })
+      } else {
+        await addPlayerMutation.mutateAsync({
+          sportId: typeof selectedSportId === 'number' ? selectedSportId : null,
+          data: {
+            fullName: playerForm.fullName.trim(),
+            dateOfBirth: playerForm.dateOfBirth || undefined,
+            jerseyNumber: playerForm.jerseyNumber ? Number(playerForm.jerseyNumber) : undefined,
+            year: playerForm.year.trim() || undefined,
+            phone: playerForm.phone.trim(),
+            email: playerForm.email.trim(),
+            department: playerForm.department.trim() || undefined,
+            notes: playerForm.notes.trim(),
+            active: true,
+            sportIds: playerForm.sportIds,
+          },
+        })
+      }
       const sportNames = playerForm.sportIds
         .map((id) => sports.find((s) => s.id === id)?.name)
         .filter(Boolean)
         .join(', ')
-      toast.success(
-        sportNames
+      toast.success(selectedExistingPlayer
+        ? `${selectedExistingPlayer.fullName} assigned to ${sportNames || 'selected sports'} without creating a duplicate.`
+        : sportNames
           ? `Player ${playerForm.fullName} registered for ${sportNames}.`
-          : `Player ${playerForm.fullName} registered.`
-      )
+          : `Player ${playerForm.fullName} registered.`)
       setAddPlayerOpen(false)
+      setSelectedExistingPlayer(null)
       setPlayerForm({
         fullName: '',
+        dateOfBirth: '',
         jerseyNumber: '',
-        position: '',
+        year: '',
         phone: '',
         email: '',
         department: '',
@@ -179,6 +223,8 @@ export default function RosterPage() {
       })
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to add player.')
+    } finally {
+      addSubmitLock.current = false
     }
   }
 
@@ -189,6 +235,7 @@ export default function RosterPage() {
       dateOfBirth: player.dateOfBirth ?? '',
       jerseyNumber: player.jerseyNumber?.toString() ?? '',
       position: player.position ?? '',
+      year: player.year ?? '',
       phone: player.phone ?? '',
       email: player.email ?? '',
       department: player.department ?? '',
@@ -211,7 +258,8 @@ export default function RosterPage() {
           fullName: editPlayerForm.fullName.trim(),
           dateOfBirth: editPlayerForm.dateOfBirth || undefined,
           jerseyNumber: editPlayerForm.jerseyNumber ? parseInt(editPlayerForm.jerseyNumber, 10) : undefined,
-          position: editPlayerForm.position || undefined,
+          position: player.position || undefined,
+          year: editPlayerForm.year || undefined,
           phone: editPlayerForm.phone || undefined,
           email: editPlayerForm.email || undefined,
           department: editPlayerForm.department || undefined,
@@ -234,8 +282,16 @@ export default function RosterPage() {
   const handleDeletePlayer = async () => {
     if (!deletePlayerDialog.player) return
     try {
-      await deletePlayerMutation.mutateAsync(deletePlayerDialog.player.id)
-      toast.success(`Athlete ${deletePlayerDialog.player.fullName} removed from roster.`)
+      if (typeof selectedSportId === 'number') {
+        await removePlayerFromSportMutation.mutateAsync({
+          playerId: deletePlayerDialog.player.id,
+          sportId: selectedSportId,
+        })
+        toast.success(`${deletePlayerDialog.player.fullName} removed from ${currentSport?.name}; their other sport registrations and attendance history remain.`)
+      } else {
+        await deletePlayerMutation.mutateAsync(deletePlayerDialog.player.id)
+        toast.success(`Athlete ${deletePlayerDialog.player.fullName} deleted.`)
+      }
       if (selectedPlayer?.id === deletePlayerDialog.player.id) {
         setSelectedPlayer(null)
       }
@@ -382,13 +438,44 @@ export default function RosterPage() {
             </Button>
           </div>
         ) : (
-          <div className="p-0 sm:overflow-x-auto">
-            <Table className="ledger-table w-full card-table">
+          <div>
+          <div className="divide-y divide-border sm:hidden">
+            {players.map((player) => (
+              <div
+                key={player.id}
+                className="flex min-h-12 items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/40"
+                onClick={() => setSelectedPlayer(player)}
+              >
+                <span className="w-8 shrink-0 text-[10px] font-mono text-muted-foreground">
+                  {player.jerseyNumber ? `#${player.jerseyNumber}` : '—'}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{player.fullName}</span>
+                <span className="max-w-[76px] truncate whitespace-nowrap text-[10px] text-muted-foreground">
+                  {[player.year, player.department].filter(Boolean).join(' · ') || '—'}
+                </span>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={`View ${player.fullName}`} onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player) }}>
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={`Edit ${player.fullName}`} onClick={(e) => { e.stopPropagation(); openEditPlayer(player) }}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  {canDeletePlayer(player) && (
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" aria-label={`Delete ${player.fullName}`} onClick={(e) => { e.stopPropagation(); setDeletePlayerDialog({ open: true, player }) }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden p-0 sm:block sm:overflow-x-auto">
+            <Table className="ledger-table w-full">
               <TableHeader>
                 <TableRow className="bg-muted/50 border-b border-border">
                   <TableHead className="w-16 font-display text-foreground font-semibold min-w-[50px]">#</TableHead>
                   <TableHead className="font-display text-foreground font-semibold min-w-[160px]">Athlete Name</TableHead>
-                  <TableHead className="font-display text-foreground font-semibold min-w-[120px]">Position / Role</TableHead>
+                  <TableHead className="font-display text-foreground font-semibold min-w-[120px]">Year / Department</TableHead>
                   <TableHead className="font-display text-foreground font-semibold min-w-[140px]">Contact</TableHead>
                   <TableHead className="font-display text-foreground font-semibold min-w-[90px]">Status</TableHead>
                   <TableHead className="font-display text-foreground font-semibold text-right min-w-[180px]">Actions</TableHead>
@@ -408,8 +495,8 @@ export default function RosterPage() {
                       <div className="font-display font-bold text-foreground text-sm">{player.fullName}</div>
                       {player.notes && <div className="text-xs text-muted-foreground truncate max-w-xs">{player.notes}</div>}
                     </TableCell>
-                    <TableCell data-label="Position" className="font-sans text-xs text-muted-foreground font-medium">
-                      {player.position || '—'}
+                    <TableCell data-label="Year / Department" className="font-sans text-xs text-muted-foreground font-medium">
+                      {[player.year, player.department].filter(Boolean).join(' · ') || '—'}
                     </TableCell>
                     <TableCell data-label="Contact" className="font-sans text-xs text-muted-foreground">
                       <div>{player.email || '—'}</div>
@@ -466,6 +553,7 @@ export default function RosterPage() {
               </TableBody>
             </Table>
           </div>
+          </div>
         )}
       </div>
 
@@ -476,10 +564,12 @@ export default function RosterPage() {
             <DialogHeader className="space-y-1">
               <DialogTitle className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
                 <UserPlus className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                Register Athlete
+                {selectedExistingPlayer ? 'Add Existing Athlete to Sports' : 'Register Athlete'}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground text-xs">
-                Add athlete details to the roster. Discipline assignments can be configured now or edited later.
+                {selectedExistingPlayer
+                  ? 'Choose additional program memberships for this existing player. Their player profile and attendance history will be preserved.'
+                  : 'Add athlete details to the roster. Similar names are checked across all sports before saving.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -490,12 +580,71 @@ export default function RosterPage() {
                   id="playerName"
                   placeholder="e.g. Alex Morgan"
                   value={playerForm.fullName}
-                  onChange={(e) => setPlayerForm({ ...playerForm, fullName: e.target.value })}
+                  onChange={(e) => {
+                    setPlayerForm({ ...playerForm, fullName: e.target.value })
+                    setSelectedExistingPlayer(null)
+                  }}
                   required
                   className="h-9 text-xs"
                 />
+                {playerForm.fullName.trim().length >= 2 && (
+                  <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
+                    <p className="text-xs font-semibold text-amber-900">
+                      {!duplicateSearchCurrent || duplicateCheckLoading
+                        ? 'Checking existing rosters…'
+                        : duplicateMatches.length
+                          ? 'Similar players found — check before registering:'
+                          : 'No matching player found in the roster.'}
+                    </p>
+                    {duplicateMatches.map((match) => (
+                      <button
+                        key={match.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedExistingPlayer(match)
+                          setPlayerForm((prev) => ({
+                            ...prev,
+                            fullName: match.fullName,
+                            sportIds: typeof selectedSportId === 'number' &&
+                              !match.sports?.some((sport) => sport.id === selectedSportId)
+                              ? [selectedSportId]
+                              : [],
+                          }))
+                        }}
+                        className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs ${
+                          selectedExistingPlayer?.id === match.id ? 'bg-amber-200 text-amber-950' : 'text-amber-900 hover:bg-amber-100'
+                        }`}
+                      >
+                        <span className="truncate font-medium">{match.fullName}</span>
+                        <span className="shrink-0 text-[10px] text-amber-800">
+                          {match.sports?.map((sport) => sport.name).join(', ') || 'Unassigned'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedExistingPlayer && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+                    <div className="font-semibold">Using existing player: {selectedExistingPlayer.fullName}</div>
+                    <div className="mt-1">Current programs: {selectedExistingPlayer.sports?.map((sport) => sport.name).join(', ') || 'none'}</div>
+                    <div className="mt-1">Selected programs will be added to this profile; no duplicate player record will be created.</div>
+                    <button type="button" className="mt-2 underline" onClick={() => setSelectedExistingPlayer(null)}>Clear existing-player selection</button>
+                  </div>
+                )}
               </div>
 
+              {!selectedExistingPlayer && <>
+              <div className="space-y-1.5">
+                <Label htmlFor="playerDob" className="text-xs font-semibold text-foreground">Date of birth (optional)</Label>
+                <Input
+                  id="playerDob"
+                  type="date"
+                  value={playerForm.dateOfBirth}
+                  onChange={(e) => setPlayerForm({ ...playerForm, dateOfBirth: e.target.value })}
+                  className="h-9 text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground">If unknown, the player's profile will show age as N/A.</p>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="jersey" className="text-xs font-semibold text-foreground">Jersey #</Label>
@@ -509,12 +658,12 @@ export default function RosterPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="position" className="text-xs font-semibold text-foreground">Position / Role</Label>
+                  <Label htmlFor="playerYear" className="text-xs font-semibold text-foreground">Academic Year</Label>
                   <Input
-                    id="position"
-                    placeholder="e.g. Forward"
-                    value={playerForm.position}
-                    onChange={(e) => setPlayerForm({ ...playerForm, position: e.target.value })}
+                    id="playerYear"
+                    placeholder="e.g. Year 2"
+                    value={playerForm.year}
+                    onChange={(e) => setPlayerForm({ ...playerForm, year: e.target.value })}
                     className="h-9 text-xs"
                   />
                 </div>
@@ -522,10 +671,10 @@ export default function RosterPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="playerDepartment" className="text-xs font-semibold text-foreground">Department / Squad</Label>
+                  <Label htmlFor="playerDepartment" className="text-xs font-semibold text-foreground">Department</Label>
                   <Input
                     id="playerDepartment"
-                    placeholder="e.g. Senior Men"
+                    placeholder="e.g. Computer Science"
                     value={playerForm.department}
                     onChange={(e) => setPlayerForm({ ...playerForm, department: e.target.value })}
                     className="h-9 text-xs"
@@ -566,9 +715,10 @@ export default function RosterPage() {
                   />
                 </div>
               </div>
+              </>}
 
               <div className="space-y-2">
-                <Label className="text-xs font-semibold text-foreground">Program Assignment(s) *</Label>
+                <Label className="text-xs font-semibold text-foreground">{selectedExistingPlayer ? 'Add to program(s) *' : 'Program Assignment(s) *'}</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto p-1 border border-border rounded-lg bg-muted/20">
                   {sports.map((sport) => {
                     const checked = playerForm.sportIds.includes(sport.id)
@@ -597,8 +747,14 @@ export default function RosterPage() {
               <Button type="button" variant="outline" onClick={() => setAddPlayerOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button type="submit" className="w-full sm:w-auto bg-brand-900 hover:bg-brand-800 text-white font-medium">
-                Register Athlete
+              <Button
+                type="submit"
+                disabled={addPlayerMutation.isPending || addExistingPlayerMutation.isPending || duplicateSearchName.length >= 2 && (!duplicateSearchCurrent || duplicateCheckLoading)}
+                className="w-full sm:w-auto bg-brand-900 hover:bg-brand-800 text-white font-medium"
+              >
+                {addPlayerMutation.isPending || addExistingPlayerMutation.isPending
+                  ? 'Saving…'
+                  : selectedExistingPlayer ? 'Add to selected sports' : 'Register Athlete'}
               </Button>
             </DialogFooter>
           </form>
@@ -657,11 +813,11 @@ export default function RosterPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="editRosterPosition" className="text-xs font-semibold text-foreground">Position</Label>
+                  <Label htmlFor="editRosterYear" className="text-xs font-semibold text-foreground">Academic Year</Label>
                   <Input
-                    id="editRosterPosition"
-                    value={editPlayerForm.position}
-                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, position: e.target.value })}
+                    id="editRosterYear"
+                    value={editPlayerForm.year}
+                    onChange={(e) => setEditPlayerForm({ ...editPlayerForm, year: e.target.value })}
                     className="h-9 text-xs"
                   />
                 </div>
@@ -678,7 +834,7 @@ export default function RosterPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="editRosterDepartment" className="text-xs font-semibold text-foreground">Department / Team</Label>
+                  <Label htmlFor="editRosterDepartment" className="text-xs font-semibold text-foreground">Department</Label>
                   <Input
                     id="editRosterDepartment"
                     value={editPlayerForm.department}
@@ -752,10 +908,14 @@ export default function RosterPage() {
           <DialogHeader className="space-y-2">
             <DialogTitle className="font-display text-destructive font-bold text-lg flex items-center gap-2">
               <Trash2 className="h-5 w-5" />
-              Remove Athlete from Roster?
+              {typeof selectedSportId === 'number' ? 'Remove Athlete from This Sport?' : 'Delete Athlete Permanently?'}
             </DialogTitle>
             <DialogDescription className="text-muted-foreground text-sm">
-              Are you sure you want to delete <strong>{deletePlayerDialog.player?.fullName}</strong>? This action will permanently remove their attendance and roster record.
+              {typeof selectedSportId === 'number' ? (
+                <>Remove <strong>{deletePlayerDialog.player?.fullName}</strong> from <strong>{currentSport?.name}</strong>? Their player profile, other sport registrations, and attendance history will be kept.</>
+              ) : (
+                <>Permanently delete <strong>{deletePlayerDialog.player?.fullName}</strong> and their roster record?</>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-2">
@@ -765,9 +925,10 @@ export default function RosterPage() {
             <Button
               type="button"
               onClick={handleDeletePlayer}
+              disabled={deletePlayerMutation.isPending || removePlayerFromSportMutation.isPending}
               className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium"
             >
-              Confirm Remove
+              {deletePlayerMutation.isPending || removePlayerFromSportMutation.isPending ? 'Removing…' : typeof selectedSportId === 'number' ? 'Remove from sport' : 'Delete permanently'}
             </Button>
           </DialogFooter>
         </DialogContent>

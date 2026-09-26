@@ -10,5 +10,5 @@ export interface Session {
     id: number
     name: string
   }
-  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'HOLIDAY'
 }

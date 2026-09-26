@@ -33,9 +33,9 @@ function Calendar({ className, classNames, components, showOutsideDays = true, .
         day: 'h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20',
         day_button: cn(
           buttonVariants({ variant: 'ghost' }),
-          'h-9 w-9 p-0 font-normal aria-selected:opacity-100'
+          'h-9 w-9 cursor-pointer p-0 font-normal aria-selected:opacity-100'
         ),
-        selected: 'bg-accent text-white hover:bg-accent-light shadow-sm',
+        selected: 'bg-transparent text-foreground',
         today: 'ring-1 ring-inset ring-accent ring-offset-0',
         outside: 'day-outside text-slate-300 opacity-60',
         disabled: 'text-slate-300 opacity-50',

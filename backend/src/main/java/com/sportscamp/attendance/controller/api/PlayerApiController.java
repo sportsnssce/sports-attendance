@@ -71,6 +71,13 @@ public class PlayerApiController {
         return ResponseEntity.ok(playerService.findAllPlayers());
     }
 
+    /** Small directory search used by the add-player duplicate check. */
+    @GetMapping("/players/search")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
+    public ResponseEntity<List<Player>> searchPlayers(@RequestParam String name) {
+        return ResponseEntity.ok(playerService.searchByName(name));
+    }
+
     /**
      * POST /api/players — register a player with one or more sports.
      * body: PlayerCreateRequest {fullName, ..., sportIds: [1, 5]}
@@ -84,6 +91,23 @@ public class PlayerApiController {
         try {
             Player created = playerService.createPlayer(null, req);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    /** Add an existing player to authorized programs; this never creates a new player record. */
+    @PostMapping("/players/{id}/sports")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
+    public ResponseEntity<?> addExistingPlayerToSports(
+            @PathVariable Long id,
+            @RequestBody Map<String, Set<Long>> body,
+            Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        Set<Long> sportIds = body == null ? null : body.get("sportIds");
+        assertSportsInScope(me, sportIds);
+        try {
+            return ResponseEntity.ok(playerService.addSports(id, sportIds));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
@@ -150,8 +174,20 @@ public class PlayerApiController {
     }
 
     /** DELETE /api/players/{id} */
-    @DeleteMapping("/players/{id}")
+    @DeleteMapping("/sports/{sportId}/players/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN','ROLE_CAPTAIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removePlayerFromSport(@PathVariable Long sportId, @PathVariable Long id, Authentication auth) {
+        User me = userService.findByUsername(auth.getName());
+        if (!isCaptainOfSport(me, sportId) && me.getRole() != User.Role.ROLE_ADMIN) {
+            throw new AccessDeniedException("You are not authorized to manage this sport roster.");
+        }
+        playerService.removeFromSport(id, sportId);
+    }
+
+    /** Delete a player record globally (administrator only). */
+    @DeleteMapping("/players/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePlayer(@PathVariable Long id, Authentication auth) {
         User me = userService.findByUsername(auth.getName());

@@ -10,6 +10,7 @@ import com.sportscamp.attendance.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -41,6 +42,19 @@ public class PlayerService {
 
     public List<Player> findAllPlayers() {
         return playerRepository.findAll();
+    }
+
+    public List<Player> searchByName(String name) {
+        if (name == null || name.isBlank()) return List.of();
+        List<Long> ids = playerRepository.findMatchingPlayerIds(name.trim(), PageRequest.of(0, 8));
+        if (ids.isEmpty()) return List.of();
+        java.util.Map<Long, Player> byId = playerRepository.findWithSportsByIdIn(ids).stream()
+                .collect(Collectors.toMap(Player::getId, player -> player));
+        return ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+    }
+
+    public List<Player> findAllByIds(Iterable<Long> ids) {
+        return playerRepository.findAllById(ids);
     }
 
     public Player findById(Long id) {
@@ -104,6 +118,32 @@ public class PlayerService {
         return playerRepository.save(player);
     }
 
+    /** Add sport memberships to an existing player without creating a duplicate player row. */
+    @Transactional
+    public Player addSports(Long playerId, Set<Long> sportIds) {
+        if (sportIds == null || sportIds.isEmpty()) {
+            throw new IllegalArgumentException("Select at least one sport program.");
+        }
+        Player player = findById(playerId);
+        Set<Long> currentIds = player.getSports().stream().map(Sport::getId).collect(Collectors.toSet());
+        for (Long sportId : sportIds) {
+            if (!currentIds.contains(sportId)) player.addSport(sportService.findById(sportId));
+        }
+        return playerRepository.save(player);
+    }
+
+    /** Remove only one roster membership; keep the player and attendance history intact. */
+    @Transactional
+    public void removeFromSport(Long playerId, Long sportId) {
+        Player player = findById(playerId);
+        Sport sport = sportService.findById(sportId);
+        boolean isMember = player.getSports().stream().anyMatch(item -> item.getId().equals(sportId));
+        if (!isMember) throw new IllegalArgumentException("Player is not enrolled in this sport.");
+        player.removeSport(sport);
+        sport.getCaptains().removeIf(captain -> captain.getId().equals(playerId));
+        playerRepository.save(player);
+    }
+
     /**
      * Update a player's profile fields and, when {@code req.sportIds()} is provided, replace
      * their sport memberships with exactly that set.
@@ -111,7 +151,9 @@ public class PlayerService {
     @Transactional
     public Player update(Long id, PlayerCreateRequest req) {
         Player existing = findById(id);
+        String existingYear = existing.getYear();
         applyBaseFields(existing, req);
+        if (req.year() == null) existing.setYear(existingYear);
         if (req.sportIds() != null) {
             syncSports(existing, new LinkedHashSet<>(req.sportIds()));
         }
@@ -140,6 +182,7 @@ public class PlayerService {
         player.setPhone(req.phone());
         player.setEmail(req.email());
         player.setDepartment(req.department());
+        player.setYear(req.year());
         player.setNotes(req.notes());
         if (req.active() != null) player.setActive(req.active());
     }
@@ -166,6 +209,7 @@ public class PlayerService {
                 player.getEmail(),
                 player.getPhone(),
                 player.getDepartment(),
+                player.getYear(),
                 !captainSports.isEmpty(),
                 List.copyOf(captainSports),
                 List.copyOf(sports),

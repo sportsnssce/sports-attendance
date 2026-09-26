@@ -33,6 +33,25 @@ public class UserApiController {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<Map<String, Object>> listCaptains() {
         List<User> captains = userService.findCaptains();
+        List<Long> linkedPlayerIds = captains.stream()
+                .map(User::getPlayerId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Player> playersById = new HashMap<>();
+        for (Player player : playerService.findAllByIds(linkedPlayerIds)) {
+            playersById.put(player.getId(), player);
+        }
+
+        Map<Long, List<Sport>> sportsByCaptainPlayerId = new HashMap<>();
+        for (Sport sport : sportService.findAll()) {
+            for (Player captain : sport.getCaptains()) {
+                sportsByCaptainPlayerId
+                        .computeIfAbsent(captain.getId(), ignored -> new java.util.ArrayList<>())
+                        .add(sport);
+            }
+        }
+
         return captains.stream().map(c -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", c.getId());
@@ -46,11 +65,13 @@ public class UserApiController {
 
             // Captains are stored as PLAYERS; a captain User's Player row is resolved via the
             // linked player id (falling back to email for legacy accounts).
-            Player captainPlayer = playerService.findLinkedPlayer(c).orElse(null);
+                Player captainPlayer = c.getPlayerId() == null
+                    ? playerService.findLinkedPlayer(c).orElse(null)
+                    : playersById.get(c.getPlayerId());
             map.put("playerId", captainPlayer == null ? null : captainPlayer.getId());
             List<Sport> assignedSports = captainPlayer == null
                     ? List.of()
-                    : sportService.findByCaptainId(captainPlayer.getId());
+                    : sportsByCaptainPlayerId.getOrDefault(captainPlayer.getId(), List.of());
             List<Map<String, Object>> sportsList = assignedSports.stream()
                     .map(s -> Map.<String, Object>of("id", s.getId(), "name", s.getName()))
                     .toList();

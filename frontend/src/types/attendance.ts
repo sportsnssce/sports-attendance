@@ -15,10 +15,34 @@ export interface AttendanceRecord {
     title?: string
     sessionDate?: string
   }
+  sessionTitle?: string
+  sessionDate?: string
+  sportId?: number
+  sportName?: string
   playerFullName?: string
   status: AttendanceStatus
   remarks?: string
   markedAt?: string
+}
+
+export interface AttendanceExportRow {
+  sportId: number
+  sportName: string
+  sessionId: number
+  sessionTitle: string
+  sessionDate: string
+  startTime?: string
+  playerId: number
+  playerName: string
+  jerseyNumber?: number
+  year?: string
+  department?: string
+  email?: string
+  phone?: string
+  status: AttendanceStatus
+  remarks?: string
+  markedAt?: string
+  markedBy?: string
 }
 
 export interface AttendanceSummary {

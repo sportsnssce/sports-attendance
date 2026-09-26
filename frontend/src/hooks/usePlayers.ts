@@ -18,6 +18,16 @@ export function useAllPlayers(enabled: boolean = true) {
   })
 }
 
+export function useSearchPlayers(name: string, enabled: boolean = true) {
+  const trimmed = name.trim()
+  return useQuery({
+    queryKey: ['players', 'search', trimmed.toLocaleLowerCase()],
+    queryFn: () => api.get('/api/players/search', { params: { name: trimmed } }).then((r) => r.data as Player[]),
+    enabled: enabled && trimmed.length >= 2,
+    staleTime: 30_000,
+  })
+}
+
 export function usePlayer(id: number) {
   return useQuery({
     queryKey: ['players', id],
@@ -50,6 +60,18 @@ export function useAddPlayer() {
   })
 }
 
+export function useAddExistingPlayerToSports() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ playerId, sportIds }: { playerId: number; sportIds: number[] }) =>
+      api.post(`/api/players/${playerId}/sports`, { sportIds }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['players'] })
+      qc.invalidateQueries({ queryKey: ['sports'] })
+    },
+  })
+}
+
 export function useUpdatePlayer() {
   const qc = useQueryClient()
   return useMutation({
@@ -68,6 +90,19 @@ export function useDeletePlayer() {
     mutationFn: (id: number) => api.delete(`/api/players/${id}`),
     onSuccess: () =>
       qc.invalidateQueries({ predicate: (q) => q.queryKey.includes('players') }),
+  })
+}
+
+export function useRemovePlayerFromSport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ playerId, sportId }: { playerId: number; sportId: number }) =>
+      api.delete(`/api/sports/${sportId}/players/${playerId}`),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['sports', variables.sportId, 'players'] })
+      qc.invalidateQueries({ queryKey: ['players'] })
+      qc.invalidateQueries({ queryKey: ['sports'] })
+    },
   })
 }
 

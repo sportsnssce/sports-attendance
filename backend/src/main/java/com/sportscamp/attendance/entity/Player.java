@@ -51,6 +51,9 @@ public class Player extends BaseEntity {
     @Column(length = 100)
     private String department;
 
+    @Column(name = "academic_year", length = 30)
+    private String year;
+
     @Column(length = 500)
     private String notes;
 

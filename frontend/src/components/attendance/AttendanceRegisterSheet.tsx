@@ -26,7 +26,7 @@ const STATUS_STYLES: Record<AttendanceStatus, string> = {
 
 const SUMMARY_STYLES: Record<AttendanceStatus, { label: string; cls: string }> = {
   PRESENT: { label: '✓ Present', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-  LATE: { label: '⏱ Late', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+  LATE: { label: 'Present(I)', cls: 'text-amber-700 bg-amber-50 border-amber-200' },
   ABSENT: { label: '✕ Absent', cls: 'text-rose-700 bg-rose-50 border-rose-200' },
   EXCUSED: { label: '— Excused', cls: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
 }
@@ -53,6 +53,8 @@ function RegisterBody({
 
   const [statuses, setStatuses] = useState<Map<number, AttendanceStatus>>(() => new Map())
   const [remarks, setRemarks] = useState<Record<number, string>>({})
+  const [saving, setSaving] = useState(false)
+  const saveLock = useRef(false)
   const initializedRef = useRef(false)
 
   const loaded = !playersLoading && !attendanceLoading
@@ -108,6 +110,9 @@ function RegisterBody({
   }, [statuses])
 
   const handleSave = async () => {
+    if (saveLock.current || bulkSubmit.isPending) return
+    saveLock.current = true
+    setSaving(true)
     const payloadRecords = players.map((p) => ({
       playerId: p.id,
       status: statuses.get(p.id) ?? 'PRESENT',
@@ -119,6 +124,9 @@ function RegisterBody({
       onClose()
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save attendance.')
+    } finally {
+      saveLock.current = false
+      setSaving(false)
     }
   }
 
@@ -165,13 +173,14 @@ function RegisterBody({
                           <button
                             key={st}
                             type="button"
+                            disabled={saving}
                             onClick={() => setStatus(p.id, st)}
                             aria-pressed={selected}
                             className={`px-2 py-1 text-[10px] font-mono font-medium rounded border transition-all ${
                               selected ? STATUS_STYLES[st] : 'bg-surface text-slate-400 border-border hover:bg-surface/80 hover:text-slate-600'
                             }`}
                           >
-                            {st}
+                            {st === 'LATE' ? 'Present(I)' : st}
                           </button>
                         )
                       })}
@@ -179,6 +188,7 @@ function RegisterBody({
                   </div>
                   <Input
                     value={remarks[p.id] ?? ''}
+                    disabled={saving}
                     onChange={(e) =>
                       setRemarks((prev) => ({ ...prev, [p.id]: e.target.value }))
                     }
@@ -201,11 +211,11 @@ function RegisterBody({
               <span className="text-slate-500 ml-auto">{players.length} athletes</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" type="button" onClick={() => markAll('PRESENT')} className="font-sans text-xs h-7">
+              <Button size="sm" variant="outline" type="button" disabled={saving} onClick={() => markAll('PRESENT')} className="font-sans text-xs h-7">
                 <CheckCheck className="h-3.5 w-3.5 mr-1" />
                 Mark All Present
               </Button>
-              <Button size="sm" variant="outline" type="button" onClick={() => markAll('ABSENT')} className="font-sans text-xs h-7">
+              <Button size="sm" variant="outline" type="button" disabled={saving} onClick={() => markAll('ABSENT')} className="font-sans text-xs h-7">
                 <RotateCcw className="h-3.5 w-3.5 mr-1" />
                 Mark All Absent
               </Button>
@@ -213,7 +223,7 @@ function RegisterBody({
               <Button
                 type="button"
                 onClick={handleSave}
-                disabled={bulkSubmit.isPending}
+                disabled={saving || bulkSubmit.isPending}
                 className="bg-accent hover:bg-accent-light text-white font-sans text-xs h-7"
               >
                 <Save className="h-3.5 w-3.5 mr-1" />

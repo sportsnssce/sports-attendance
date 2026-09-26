@@ -19,6 +19,9 @@ public class TrainingSessionService {
 
     private static final String MORNING_TITLE_SUFFIX = " - Morning Session";
     private static final String EVENING_TITLE_SUFFIX = " - Evening Session";
+        private static final List<TrainingSession.SessionStatus> UPCOMING_STATUSES = List.of(
+            TrainingSession.SessionStatus.SCHEDULED,
+                TrainingSession.SessionStatus.IN_PROGRESS);
 
     private final TrainingSessionRepository sessionRepository;
     private final SportService sportService;
@@ -33,11 +36,14 @@ public class TrainingSessionService {
      */
     @Transactional
     public List<TrainingSession> findBySportAndDate(Long sportId, LocalDate date) {
-        sportService.findById(sportId);
+        Sport sport = sportService.findById(sportId);
         List<TrainingSession> existing = sessionRepository.findBySportIdAndSessionDate(sportId, date);
         if (existing.isEmpty()) {
-            createForSport(defaultSession(date, MORNING_TITLE_SUFFIX, LocalTime.of(7, 0), LocalTime.of(9, 0)), sportId);
-            createForSport(defaultSession(date, EVENING_TITLE_SUFFIX, LocalTime.of(16, 30), LocalTime.of(18, 30)), sportId);
+            TrainingSession morning = defaultSession(date, MORNING_TITLE_SUFFIX, LocalTime.of(7, 0), LocalTime.of(9, 0));
+            TrainingSession evening = defaultSession(date, EVENING_TITLE_SUFFIX, LocalTime.of(16, 30), LocalTime.of(18, 30));
+            morning.setSport(sport);
+            evening.setSport(sport);
+            return sessionRepository.saveAll(List.of(morning, evening));
         }
         return sessionRepository.findBySportIdAndSessionDate(sportId, date);
     }
@@ -59,6 +65,15 @@ public class TrainingSessionService {
 
     public List<TrainingSession> findAll() {
         return sessionRepository.findAllWithSport();
+    }
+
+    public List<TrainingSession> findUpcoming(LocalDate today) {
+        return sessionRepository.findUpcoming(today, UPCOMING_STATUSES);
+    }
+
+    public List<TrainingSession> findUpcomingBySportIds(List<Long> sportIds, LocalDate today) {
+        if (sportIds.isEmpty()) return List.of();
+        return sessionRepository.findUpcomingBySportIds(sportIds, today, UPCOMING_STATUSES);
     }
 
     public TrainingSession findById(Long id) {

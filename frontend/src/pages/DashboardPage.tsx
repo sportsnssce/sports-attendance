@@ -10,7 +10,7 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { StatCard } from '@/components/shared/StatCard'
-import { useSports, useMySports, useCaptains, useAllSessions } from '@/hooks'
+import { useSports, useMySports, useCaptains, useUpcomingSessions } from '@/hooks'
 import { useAuth } from '@/hooks/useAuth'
 import { Trophy, ShieldCheck, Calendar, Activity, Sparkles, Inbox } from 'lucide-react'
 
@@ -19,9 +19,9 @@ export default function DashboardPage() {
   const isCaptain = role === 'ROLE_CAPTAIN'
 
   const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)
-  const { data: mySports = [], isLoading: mySportsLoading } = useMySports()
+  const { data: mySports = [], isLoading: mySportsLoading } = useMySports(isCaptain)
   const { data: captains = [], isLoading: captainsLoading } = useCaptains(!isCaptain)
-  const { data: sessions = [], isLoading: sessionsLoading } = useAllSessions()
+  const { data: sessions = [], isLoading: sessionsLoading } = useUpcomingSessions()
 
   const sports = isCaptain ? mySports : allSports
   const sportsLoading = isCaptain ? mySportsLoading : allSportsLoading

@@ -19,9 +19,31 @@ public interface TrainingSessionRepository extends JpaRepository<TrainingSession
     List<TrainingSession> findAllWithSport();
 
     @Query("""
-            SELECT ts FROM TrainingSession ts 
+            SELECT ts FROM TrainingSession ts LEFT JOIN FETCH ts.sport
+            WHERE ts.sessionDate >= :today AND ts.status IN :statuses
+            ORDER BY ts.sessionDate ASC, ts.startTime ASC
+            """)
+    List<TrainingSession> findUpcoming(
+            @Param("today") LocalDate today,
+            @Param("statuses") List<TrainingSession.SessionStatus> statuses);
+
+    @Query("""
+            SELECT ts FROM TrainingSession ts LEFT JOIN FETCH ts.sport
+            WHERE ts.sport.id IN :sportIds
+              AND ts.sessionDate >= :today
+              AND ts.status IN :statuses
+            ORDER BY ts.sessionDate ASC, ts.startTime ASC
+            """)
+    List<TrainingSession> findUpcomingBySportIds(
+            @Param("sportIds") List<Long> sportIds,
+            @Param("today") LocalDate today,
+            @Param("statuses") List<TrainingSession.SessionStatus> statuses);
+
+    @Query("""
+                                                SELECT ts FROM TrainingSession ts LEFT JOIN FETCH ts.sport
             WHERE ts.sport.id = :sportId 
               AND ts.sessionDate BETWEEN :from AND :to
+                                                ORDER BY ts.sessionDate ASC, ts.startTime ASC
             """)
     List<TrainingSession> findBySportIdAndSessionDateBetween(
             @Param("sportId") Long sportId,

@@ -27,19 +27,23 @@ import {
   useMySports,
   useSessions,
   usePlayers,
+  useSessionAttendanceCounts,
   useDeleteSession,
+  useUpdateSessionStatus,
   useAuth,
 } from '@/hooks'
 import { type Session } from '@/types'
-import { CalendarDays, Plus, Trash2, Trophy, AlertTriangle } from 'lucide-react'
+import { CalendarDays, Plus, Trash2, Trophy, AlertTriangle, Download } from 'lucide-react'
 import { parseISOLocal, todayISOLocal } from '@/lib/date'
+import { downloadCsv } from '@/lib/csv'
+import { useExportSportAttendance, useExportSportAttendanceSummary } from '@/hooks/useAttendance'
 
 export default function AttendancePage() {
   const { role } = useAuth()
   const isCaptain = role === 'ROLE_CAPTAIN'
 
   const { data: allSports = [], isLoading: allSportsLoading } = useSports(!isCaptain)
-  const { data: mySports = [], isLoading: mySportsLoading } = useMySports()
+  const { data: mySports = [], isLoading: mySportsLoading } = useMySports(isCaptain)
 
   const sports = isCaptain ? mySports : allSports
   const sportsLoading = isCaptain ? mySportsLoading : allSportsLoading
@@ -80,8 +84,58 @@ export default function AttendancePage() {
     date: selectedDate,
   })
   const { data: players = [] } = usePlayers(selectedSportId ?? 0)
+  const sessionIds = useMemo(() => daySessions.map((session) => session.id), [daySessions])
+  const { data: attendanceCounts = new Map<number, number>() } = useSessionAttendanceCounts(
+    selectedSportId ?? 0,
+    sessionIds
+  )
 
   const deleteSession = useDeleteSession()
+  const updateSessionStatus = useUpdateSessionStatus()
+  const exportAttendance = useExportSportAttendance()
+  const exportSummary = useExportSportAttendanceSummary()
+
+
+  const handleExportPlayerTotals = async () => {
+    if (!selectedSportId || exportSummary.isPending) return
+    try {
+      const rows = await exportSummary.mutateAsync(selectedSportId)
+      const fileSport = (currentSport?.name ?? 'sport').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      downloadCsv(
+        `${fileSport}-player-totals.csv`,
+        ['Player', 'Jersey #', 'Year', 'Department', 'Present', 'Absent', 'Present(I)', 'Excused', 'Total sessions'],
+        rows.map((r) => [
+          r.playerName, r.jerseyNumber ?? '', r.year ?? '', r.department ?? '',
+          r.presentCount, r.absentCount, r.injuredCount, r.excusedCount, r.totalSessions,
+        ])
+      )
+      toast.success(`Exported totals for ${rows.length} players.`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not export player totals.')
+    }
+  }
+
+  const handleExportSessionCsv = async (session: Session) => {
+    if (exportAttendance.isPending) return
+    try {
+      const rows = await exportAttendance.mutateAsync({ sportId: selectedSportId!, date: selectedDate })
+      const sessionRows = rows.filter((r) => r.sessionId === session.id)
+      const fileSport = (currentSport?.name ?? 'sport').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      const fileSession = session.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      downloadCsv(
+        `${fileSport}-${fileSession}-${selectedDate}.csv`,
+        ['Player', 'Jersey #', 'Year', 'Department', 'Attendance', 'Remarks'],
+        sessionRows.map((r) => [
+          r.playerName, r.jerseyNumber ?? '', r.year ?? '', r.department ?? '',
+          r.status == null ? 'Not recorded' : r.status === 'LATE' ? 'Present(I)' : r.status,
+          r.remarks ?? '',
+        ])
+      )
+      toast.success(`Exported ${sessionRows.length} records for "${session.title}".`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not export session attendance.')
+    }
+  }
 
   const changeSport = (id: number) => {
     setSelectedSportId(id)
@@ -109,6 +163,18 @@ export default function AttendancePage() {
       setDeleteDialog({ open: false, session: null })
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to delete session.')
+    }
+  }
+
+  const handleToggleHoliday = async (session: Session) => {
+    const status = session.status === 'HOLIDAY' ? 'SCHEDULED' : 'HOLIDAY'
+    try {
+      await updateSessionStatus.mutateAsync({ id: session.id, status })
+      toast.success(status === 'HOLIDAY'
+        ? `“${session.title}” marked as no camp. It will not count toward athlete attendance.`
+        : `“${session.title}” restored to scheduled.`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Could not update the session.')
     }
   }
 
@@ -169,6 +235,8 @@ export default function AttendancePage() {
         </div>
       </div>
 
+
+
       {/* Main Grid: Calendar Column & Session Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6 items-start">
         {/* Sticky Calendar Surface */}
@@ -177,6 +245,20 @@ export default function AttendancePage() {
             <CalendarDays className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <h2 className="font-display font-bold text-base text-foreground">Program Calendar</h2>
           </div>
+
+          {/* Export Button — above the calendar */}
+          <div className="flex flex-col gap-2 mb-4">
+            <Button
+              onClick={handleExportPlayerTotals}
+              disabled={!selectedSportId || exportSummary.isPending}
+              variant="outline"
+              className="w-full font-medium text-xs h-9 px-3 gap-2 justify-start"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>{exportSummary.isPending ? 'Preparing…' : 'Export player totals'}</span>
+            </Button>
+          </div>
+
           {selectedSportId ? (
             <AttendanceCalendar
               sportId={selectedSportId}
@@ -206,14 +288,16 @@ export default function AttendancePage() {
                     : `${daySessions.length} session${daySessions.length === 1 ? '' : 's'} scheduled`}
               </p>
             </div>
-            <Button
-              onClick={() => setCustomOpen(true)}
-              disabled={!selectedSportId}
-              className="bg-brand-900 hover:bg-brand-800 text-white font-medium text-xs h-10 px-4 gap-2 rounded-lg shadow-2xs transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Custom Session</span>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setCustomOpen(true)}
+                disabled={!selectedSportId}
+                className="bg-brand-900 hover:bg-brand-800 text-white font-medium text-xs h-10 px-4 gap-2 rounded-lg shadow-2xs transition-all"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Custom Session</span>
+              </Button>
+            </div>
           </div>
 
           {!selectedSportId ? (
@@ -235,10 +319,15 @@ export default function AttendancePage() {
                 <SessionCard
                   key={s.id}
                   session={s}
+                  presentCount={attendanceCounts.get(s.id) ?? 0}
                   totalPlayers={players.length}
                   canDelete
                   onOpen={() => setRegisterSession(s)}
                   onDelete={() => setDeleteDialog({ open: true, session: s })}
+                  onToggleHoliday={() => handleToggleHoliday(s)}
+                  holidayPending={updateSessionStatus.isPending}
+                  onExportCsv={() => handleExportSessionCsv(s)}
+                  exportPending={exportAttendance.isPending}
                 />
               ))}
             </div>

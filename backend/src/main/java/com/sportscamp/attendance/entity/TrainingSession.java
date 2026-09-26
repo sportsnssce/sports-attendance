@@ -63,6 +63,6 @@ public class TrainingSession extends BaseEntity {
     }
 
     public enum SessionStatus {
-        SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+        SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, HOLIDAY
     }
 }

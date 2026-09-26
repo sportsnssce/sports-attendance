@@ -9,6 +9,7 @@ export interface Player {
   phone?: string
   email?: string
   department?: string
+  year?: string
   notes?: string
   active?: boolean
   /** Multi-sport memberships returned by the backend in the new model. */
@@ -32,6 +33,7 @@ export interface PlayerProfile {
   email?: string | null
   phone?: string | null
   department?: string | null
+  year?: string | null
   isCaptain: boolean
   /** Every sport this player captains (multi-sport captaincy is supported). */
   captainSports: SportLite[]

@@ -17,10 +17,11 @@ export function useActiveSports() {
   })
 }
 
-export function useMySports() {
+export function useMySports(enabled: boolean = true) {
   return useQuery({
     queryKey: ['sports', 'my'],
     queryFn: () => api.get('/api/sports/my').then((r) => r.data as Sport[]),
+    enabled,
   })
 }
 
